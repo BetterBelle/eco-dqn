@@ -1,0 +1,69 @@
+\documentclass{article}
+
+
+\title{Report}
+\author{Annabelle Cloutier}
+
+
+\begin{document}
+\maketitle
+
+\section{Paper}
+
+\subsection{Network Structure}
+
+\subsubsection{Node Embedding}
+
+The MPNN structure used converts each vertex into a set of $m$ observations and encodes them into a $n$-dimensional embedding using learned weights. The paper uses 64 dimensional embeddings, but this could be any size. 
+
+\subsubsection{Edge Embedding}
+
+The edges for each vertex are also encoded into a separate $n$-dimensional embedding, same size as for each vertex, once again learned. The input for this step is the set of $m$ observations of the neighboring vertices catenated with the weight on the connecting edge, creating an $m + 1$ dimensional vector for each neighboring vertex. All of these vectors are then summed and passed through a learned layer, creating an $n - 1$ dimensional vector. At this stage, the resulting $n - 1$ dimensional vector is divided by the number of neighbors, catenated with the number of neighbors, and passed through another learned layer, resulting in an $n$-dimensional embedding representing the edges for a vertex.
+
+The end result of these two steps are an $n$-dimensional embedding representing a vertex and another $n$-dimensional embedding representing it's neighbors, all created using the same learned weights for every vertex. Meaning there will be $2|V|$, $n$-dimensional embeddings. 
+
+\subsubsection{}
+
+\subsection{Generic Sections}
+
+Most of this structure is generic for any graph. The entire input structure (node and edge embeddings) are completely generic and can be used to embed graph information irrespective of the graph size, 
+
+\subsection{Non-Generic Sections}
+
+\subsection{Benchmarks}
+
+\subsection{Graph Generation}
+
+
+\section{Code}
+
+\subsection{Running Code}
+
+\subsection{Graph Generation}
+
+\subsection{Input Conversion}
+
+\subsection{Benchmarks}
+
+- Understand CO with DQN | ECO-DQN Paper (SORTA)
+	- Read through other papers to help understand (N/A)
+	- Get code to work (DONE)
+		- Understand code (SORTA)
+
+### Current issues with understanding
+- Need to figure out the Python graphing library that they used to generate graphs, though that's a problem for later. Also if I want to modify the network structure, I need to figure out how the code transforms the math from the paper into a proper network.
+
+# Ideas from ECO-DQN
+- Modifying observations? Not sure exactly what to modify.
+- Modifying network structure? Not sure exactly what to change. It all seems very well laid out to me.
+- Applying ECO-DQN to other problems:
+	- Convert other CO problems into Max Cut?
+	- Convert other problems into a graph, modify observations (and possibly the network structure itself) to fit new outputs while keeping the original idea intact (exploratory DQN)
+- Possible problems to solve with ECO-DQN
+	- Need to train a new network for any sized graph (i.e. if you're dealing with graphs with 20, 50 and 100 nodes, you need to construct and train 3 different networks)
+		- Compression? How to compress graphs of arbitrary size? It has to be a consistent size
+		- Has to compress (or I guess also expand) to exactly the same size
+		- Information loss with compression? How consequential is it.
+
+
+\end{document}
