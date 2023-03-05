@@ -19,11 +19,63 @@ The network structure is incredibly generic most of the way through, but notes a
 
 The MPNN (Message Passing Neural Network) structure used converts each vertex into a set of $m$ observations and encodes them into a $n$-dimensional embedding using learned weights. The paper states that they use 64 dimensional embeddings and they do in code, but this could be any size. 
 
+The observations in the paper as well as their justifications for them are as follows: 
+
+\begin{enumerate}
+    \item Whether the current vertex belongs to the solution set $S$ or not; 
+    
+    This is a local observation. The reason they state this observation is important is that it provides useful information for the agent to make a decision on whether the vertex should be added or removed from the solution set.
+
+    \item The immediate cut change if the current vertex state is changed;
+    
+    This is also a local observation. Just as with the above observation, they state this provides useful information for decision making. They also state is that it allows the agent to exploit having reversible actions. This makes intuitive sense, as knowing the difference between having a vertex in the solution or not can allow the agent to make an informed decision on whether to add or remove it, or in this agent's case, possibly reversing an action. 
+
+    \item The number of steps since the current vertex state was changed;
+    
+    Also a local observation. For this observation, they mention that it provides a simple history to the agent to prevent looping decisions. Because this observation gets larger as time goes on and a vertex is unchanged, the agent will be further incentivised to choose other vertices if it gets stuck in a loop choosing the same few nodes over and over. They also state it allows the agent to exploit reversible actions just as with observation 2. This specific observation could be important as the value increases as the vertex remains unchanged, which can entice the agent to choose vertices that have not been chosen in a long time to encourage exploration just as it will discourage loops.
+    
+    \item The difference of the current cut value from the best observed;
+    
+    This and all future observations are global. This observation they state ensures the rewards are Markovian. I'm not completely certain how this ensures that. Further reading will be necessary to properly understand. Just as with observations 2-4, this observation they also mention allows the agent to exploit having reversible actions, which makes intuitive sense. The agent knowing the difference between the current cut value and the best one observed, along with the other observations, can allow the network to make informed decisions on whether the current solution is a promising set to explore.
+
+    \item The distance of the current solution set from the best observed;
+    
+    This observation as with observation 5 they state ensures the rewards are Markovian. Again, this observation allows the agent to exploit reversible actions. 
+
+    The difference between this and observation 5 is that observation 5 compares the cut value only. This observation compares the solution sets and counts the number of vertices that differ between the best observed solution set of vertices and the current one. This is not explained in the paper, but can be seen in the code, specifically in src/envs/spinsystem.py, in the SpinSystemBase class' step function.
+
+    Example for clarity:
+
+    Best seen bitmask of vertices: $[0, 0, 1, 0, 1]$
+
+    Current bitmask of vertices: $[0, 1, 1, 0, 1]$.
+
+    Difference: 1. 
+
+    Counting the number of different vertices they do in code by subtracting the two and counting the number of non-zero values. This can also be done using a bitwise XOR and doing a sum on the resulting bitmask. 
+
+    \item The number of available actions that immediately increase the cut value;
+    
+    Once again, this observation ensures Markovian rewards, they also mention that this allows exploitation of reversible actions, which is more easily understandable.
+
+    \item The number of steps remaining in the episode
+    
+    The only reasoning they have for this observation is that it accounts for the finite time used for solution exploration. 
+
+\end{enumerate}
+
 \subsubsection{Edge Embedding}
 
 The edges for each vertex are also encoded into a separate $n$-dimensional embedding, same size as for each vertex, once again learned. The input for this step is the set of $m$ observations of the neighboring vertices catenated with the weight on the connecting edge, creating an $m + 1$ dimensional vector for each neighboring vertex. All of these vectors are then summed and passed through a learned layer, creating an $n - 1$ dimensional vector. At this stage, the resulting $n - 1$ dimensional vector is divided by the number of neighbors, catenated with the number of neighbors, and passed through another learned layer, resulting in an $n$-dimensional embedding representing the edges for a vertex.
 
 The end result of these two steps are an $n$-dimensional embedding representing a vertex and another representing it's neighbors, all created using the same learned weights for every vertex. Meaning there will be $2|V|$, $n$-dimensional embeddings. 
+
+
+\begin{enumerate}
+    \item Why 64 dimensions on the node and edge embeddings? 
+    
+    It's nice that it's 64 but finding the reason why will be important to make informed decisions on modifying the network.
+\end{enumerate}
 
 \subsubsection{Message Passing}
 
@@ -33,29 +85,41 @@ The next is the update layer, which is the embedding for that vertex, catenated 
 
 The message then update is performed $K$ times. Mentioned in the paper and corroborated in the code, this is done 3 times, but can be done however many times necessary.
 
+\begin{enumerate}
+    \item Why have new network layers for these steps?
+    
+    As with the decision on the hidden layers sizes, understanding the justification for why certain steps are passed through learned functions before more calculations are performed will help make informed decisions on network changes.
+\end{enumerate}
+
 \subsubsection{Readout}
 
 The readout layer goes through each vertex, summing the embeddings for the neighbors of that vertex, dividing the result by the number of vertices in the entire graph and then passing it through learned weights, resulting in an $n$-dimensional vector.
 
 The embedding for the vertex itself is then catenated to the resulting vector and passed through another set of learned weights (without applying ReLU), resulting in a single output value. This value represents the Q-value for that node, which is used by the algorithm to determine which vertex will be added/removed from the solution set on that step. The node associated to the maximum Q-value is added to the solution set if it doesn't yet belong to it, or removed from the solution set if it belongs to it.
 
-\subsection{Generic Sections}
+\subsection{Discussion on Generalization}
 
-Most of this structure is generic for any graph. The entire input structure (node and edge embeddings) are completely generic and can be used to embed graph information irrespective of topology. The graph input is even flexible to changes in problem statement as the number of observations as well as their values can be modified to fit a different problem, or modify the observations of the same problem, which was the Maximum Cut Problem in the paper. Because the entire structure within the neural network doesn't have anything specific to the Maximum Cut Problem and is purpose built to simply pass the information of other vertices from vertex to vertex, none of the inner structure necessarily needs to change to fit a different problem.
+\textit{Most of the internal structure is generic for any graph, however because of the large number of changes that would likely need to be made to observations as well as the interpretation of the output for many other types of problems, it is likely that some changes to the internal structure would have to be made for the agent to make more educated decisions on new problems.}
 
-To apply this structure to a different problem, one only needs to change the number of observations as needed or change the observations themselves, the rest of the network simply passes this information between graph vertices and produces an output for each vertex, going through trained layers to interpret the information when needed.
+\textit{Everything outside of observations (input) and Q-values (output) only propagates information throughout the graph. This means the internal structure likely could remain mostly the same for any problem, so long as good decisions are made for the observations and that the output or it's interpretation are modified to fit new problems.}
 
-\subsection{Non-Generic Sections}
+\textit{It is possible for more complex problems that some of the internal structure for the message and update sections of the network may have to change in order to accommodate for extra information. It is also possible that global observations could be embedded somewhere within the internal structure of the network instead of as input observations for every vertex, \textbf{though more reading on Markov Decision Processes is required to properly understand why global observations are embedded into every vertex instead of being passed from within the internal structure of the network.}}
 
 The main issue comes with the output and it's interpretation. Each vertex is represented by a single value as the output, and that value is interpreted as adding or removing it from the solution set, in the context where the solution is a subset of the vertices in the graph. More specifically for the Max Cut problem, the vertex associated with the maximum Q-value (output value) is taken and then either added or removed from the solution set, depending on whether it already belongs to it or not. 
 
-This approach works fine for a problem like Maximum Cut, Minimum Vertex Cover or any other combinatorial optimization problem where the solution is to split the vertices of the graph into two sets. However, this does not work for a problem like the Traveling Salesman Problem where the solution is an ordered list of vertices, or the Minimum K-Cut Problem which can have an arbitrary number partitions of the graph. Modifications to either the output or its interpretation would have to be done in order to use this structure or a similar one for one of these different problems or a similar one. This is especially important if the output is to be as generic as possible. 
+\textit{This approach works fine for a problem like Maximum Cut or Minimum Vertex Cover where the solution can be represented as a set representing chosen vertices for the solution, however any extra constraints forces the output interpretation to be completely redesigned.}
+
+\textit{For example, the Traveling Salesman Problem where the solution is an ordered list of vertices would not correctly work as the current implementation of simply adding or removing a vertex from the solution could not work.}
+
+\textit{The Minimum K-Cut Problem which can have an arbitrary number partitions of the graph would also not work with the current model as it would require extra decision making on deciding which set to move a vertex to.}
+
+\textit{The Minimum Bisection Problem can be represented as a set of chosen vertices, however the extra constraint that the number of chosen vertices has to be the same as the number of unchosen vertices makes the current output interpretation incomplete for solving this problem.}
 
 \subsection{Benchmarks}
 
 The paper displays the performance of the graph in reference to S2V-DQN, a similar paper where the algorithm does not allow for reversing actions as well as a greedy algorithm. It also compares it's performance against modifications of itself, namely where some observations are restricted, intermediate rewards are not given for reaching locally optimal solutions, as well as keeping it from reversing its actions. 
 
-They use GSet graphs G1-10 and G22-32 for calculating the approximation ratio, asl well as the Physics dataset. 
+They use GSet graphs G1-10 and G22-32 for calculating the approximation ratio, as well as the Physics dataset. 
 
 \subsection{Graph Generation}
 
@@ -73,9 +137,11 @@ They very generously provide a README file that specifies the exact commands to 
 
 Unsure of the exact implementation, it seems they use NetworkX's ability to generate random graphs in order to do this. It's completely unnecessary though seeing as they have many test, validation and benchmark graphs pre-built within their code that can be used. If absolutely necessary, creating random graphs and storing them within a pickle file as they do would likely lower the workload on inputs as the code for parsing through these types of files is already prebuilt.
 
+\textit{The code for generating new random graphs exists in src/envs/utils. This includes the code for generating Erdos-Renyi and Barabasi-Albert graphs, as well as classes for numerous other types of random graphs.}
+
 \subsection{Input Conversion}
 
-Completely in the dark here. The code for converting graphs into observations seems to exist within src/envs/spinsystem.py but further code inspection is needed to see exactly what's happening. The idea behind it is incredibly straightforwards, it's merely a matter of finding where this is done so modifications can be made, as our observations will have to be different if we're not doing the Maximum Cut. 
+\textit{The code for converting graphs into observations seems to exist within the file src/envs/spinsystem.py but further code inspection is needed to see exactly how this information is represented and decoded by the agent.}
 
 \subsection{Benchmarks}
 
