@@ -36,7 +36,7 @@ The observations in the paper as well as their justifications for them are as fo
     
     \item The difference of the current cut value from the best observed;
     
-    This and all future observations are global. This observation they state ensures the rewards are Markovian. I'm not completely certain how this ensures that. Further reading will be necessary to properly understand. Just as with observations 2-4, this observation they also mention allows the agent to exploit having reversible actions, which makes intuitive sense. The agent knowing the difference between the current cut value and the best one observed, along with the other observations, can allow the network to make informed decisions on whether the current solution is a promising set to explore.
+    This and all future observations are global. This observation they state ensures the rewards are Markovian. I'm not completely certain how this ensures that. \textbf{Further reading will be necessary to properly understand why these observations make the rewards Markovian}. Just as with observations 2-4, this observation they also mention allows the agent to exploit having reversible actions, which makes intuitive sense. The agent knowing the difference between the current cut value and the best one observed, along with the other observations, can allow the network to make informed decisions on whether the current solution is a promising set to explore.
 
     \item The distance of the current solution set from the best observed;
     
