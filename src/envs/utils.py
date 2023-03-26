@@ -114,13 +114,6 @@ class RandomGraphGenerator(GraphGenerator):
         else:
             return matrix
 
-        m = self.pad_matrix(self.matrix) if with_padding else self.matrix
-
-        if self.biased:
-            b = self.pad_bias(self.bias) if with_padding else self.bias
-            return m, b
-        else:
-            return m
 
 class RandomErdosRenyiGraphGenerator(GraphGenerator):
 
