@@ -11,3 +11,4 @@ log_data.pkl
 *.fls
 *.log
 *.synctex.gz
+*.toc
