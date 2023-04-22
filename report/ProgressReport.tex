@@ -187,9 +187,12 @@ A vertex cover is a set of vertices such that every edge in a graph has at least
     \item What will the reward be for finding a valid solution 
     \item What will be the punishment (if any) for finding sets that are invalid solutions 
     \item Should an intermediate reward be used for finding valid solutions that are locally optimal
+    \item Should we allow invalid candidate solutions
 \end{enumerate}
 
-Thankfully, some of these are somewhat trivial to solve by either using ideas from ECO-DQN \cite{eco-dqn} and the similar S2V-DQN \cite{s2v-dqn} which does not allow for exploration/undoing actions but does tackle the Minimum Vertex Cover.
+Thankfully, some of these are somewhat trivial to solve, like the observations and reward, by either using ideas from ECO-DQN \cite{eco-dqn} and the similar S2V-DQN \cite{s2v-dqn} which does not allow for exploration/undoing actions but does tackle the Minimum Vertex Cover.
+
+The last question we'll tackle in two parts. First, we'll attempt this problem by giving the network valid solutions and not allowing it to select invalid ones by severely penalizing those actions and randomizing a new solution to give it at test time to avoid the network getting stuck in local optimums in case it continuously tries to suggest invalid candidates.
 
 \subsection{Observations}
 
@@ -197,37 +200,45 @@ In ECO-DQN, they have their set of observations from which we can draw to design
 
 \begin{itemize}
     \item Observation 1, "Vertex sate, i.e. if $v$ is currently in the solution set, $S$" is very easily translatable. We can directly copy this information, irrespective of if the current state is a valid solution.
-    \item Observation 2, "Immediate cut change if vertex state is changed". This is also relatively easily to translate to the Minimum Vertex Cover. Instead of using the cut change, we can simply state this as the immediate change in the number of edges covered when the vertex state is changed. 
     \item Observation 3 "Steps since the vertex state was last changed". This one also can be directly copied.
+    \item Observation 4 "Difference of current cut-value from best observed". We will translate this to the difference between the current cover set size and the best observed.
     \item Observation 5 "Distance of current solution set from the best observed". In the paper they do not define this, but it is explained through their implementation in Section \ref{node-embedding}, Node Embeddings. We can also use this information for the Minimum Vertex Cover in the same way.
-    \item Observation 6 "Number of available actions that immediately increase the cut value" can also be translated. Namely, counting the number of actions (or vertices) that when added to the current state will increase the number of edges that are covered.
+    \item Observation 6 "Number of available actions that immediately increase the cut value" can also be translated. Namely, counting the number of actions (or vertices) that when removed from the set will reduce the number of vertices in the cover. 
     \item Observation 7 "Steps remaining in the episode". This, once again, can be directly copied.
 \end{itemize}
 
-The one observation that will differ is that they use the notion of a difference between the current solution from the best seen. This notion is not so simple in the Minimum Vertex Cover. For the Maximum Cut, every state is a candidate solution and therefore computing a difference is very simple, as you only need to compare cut values. This is completely different in the Minimum Vertex Cover as it is possible that there are no valid solutions yet seen. Because of this issue, the notion of this observations will be separated into two distinct observations:
+The observation that will change is the immediate cut change. Due to the nature of the Minimum Vertex Cover, the immediate change in the cover set size is implied by observation one. Therefore, we will change this slightly to instead represent an observation for in the case where we'll allow invalid candidates: 
 
 \begin{enumerate}
     \item Difference of current edge cover from the best observed. The "edge cover" in this case will be the number of edges covered by the state, which can be less than the total number of edges in the graph.
-    \item Difference of the size of the current cover from the best observed. The "size of cover" in this case depicts the number of vertices that have been chosen to be in the cover for a certain state. 
 \end{enumerate}
 
-We also want to embed information about the validity of the current state, therefore we also add the following observation: "Whether the current cover is a valid vertex cover that covers all edges". This leaves us with the following observations:
+We also want to embed information about the validity of the current state in case we allow invalid candidates, therefore we also add the following observations: 
+
+\begin{enumerate}
+    \item Immediate change of edge cover on vertex change, which will compute the difference of the number of edges that are covered by the current candidate compared to the best observed.
+    \item Whether the current cover is valid; that it covers all edges.
+\end{enumerate}
+
+In the end, we'll have 9 observations, some of them only used for when the network will be permitted to explore candidates that are invalid solutions. Observations 1-6 will be used regardless of whether we allow invalid candidates, observations 7-9 will only be used if we allow invalid candidates.
 
 \begin{enumerate}
     \item Vertex state i.e. whether the vertex is in the current solution set.
-    \item Immediate change in the number of edges covered when the vertex state is changed.
     \item Steps since the vertex state was last changed.
-    \item Difference of current edge cover from the best observed.
-    \item Difference of the size of the current cover from the best observed.
+    \item Difference of current cover set size from the best observed.
     \item Distance of current solution set from the best observed. 
-    \item Number of available actions that immediately increase the edge cover. 
-    \item Whether the current cover is a valid vertex cover
+    \item Number of available actions that immediately decrease the number of vertices in the solution.
     \item Steps remaining in the episode.
+    \item Immediate change in current edges covered.
+    \item Difference of current edges covered from best observed.
+    \item Whether the current cover is a valid cover.
 \end{enumerate}
 
-As in ECO-DQN \cite{eco-dqn}, we can separate these into local (1-3) and global (4-9) observations.
+In this case as with ECO-DQN \cite{eco-dqn}, we have local (1-3, 7) and global (4-6, 8-9) observations.
 
-To start, we'll do a basic algorithm to select edges at random, picking the nodes incident on the edge and removing all edges incident on the chosen nodes until all edges are covered. We will then use this generated solution and give it to the agent as a starting point. In this scenario, we won't allow for invalid candidates, and will give a large negative reward for choosing invalid candidates. If an invalid choice is suggested during test time, we'll ignore it and use the next largest Q-value. 
+To start, we'll do a basic algorithm to select edges at random, picking the nodes incident on the edge and removing all edges incident on the chosen nodes until all edges are covered. We will then use this generated solution and give it to the agent as a starting point. In this scenario, we won't allow for invalid candidates, and will give a large negative reward for choosing invalid candidates. If an invalid choice is suggested during test time, we'll generate another random valid solution and get the network to continue from the newly generated solution. 
+
+Where we'll allow for invalid candidates, we'll generate a random candidate as the starting point, irrespective of validity.
 
 \subsection{Reward Shaping}
 
@@ -237,19 +248,20 @@ In ECO-DQN \cite{eco-dqn}, the reward for a certain state is framed as
 
 $R(S) = max(0, C(S) - C(S*))$
 
-textit{where $C(S)$ is the cut value for state $S$ and $S*$ will be the previously best seen cut value. They also grant intermediate rewards $\frac{1}{|V|}$ any time a locally optimal cut is found, which is a cut where any change to a vertex reduces the value of the cut.}
+where $C(S)$ is the cut value for state $S$ and $S*$ will be the previously best seen cut value. They also grant intermediate rewards $\frac{1}{|V|}$ any time a locally optimal cut is found, which is a cut where any change to a vertex reduces the value of the cut.
 
 In S2V-DQN \cite{s2v-dqn}, the reward for a Minimum Vertex Cover they define as $R(S, v) = -|S| - -|S'|$ being the change in their cost function when going from state $S$ and adding vertex $v$ to it, resulting in state $S'$. In these cases, the state is the set of vertices chosen for a candidate solution. We can reformulate their idea slightly to coincide with the idea in ECO-DQN to allow for exploration by instead looking only at defining the reward on a specific state in comparison to the best seen.
 
 In our case, the best seen is not so simply defined. Because constructed candidates may not be valid, some way to compare invalid candidates to valid ones has to be devised such that we can choose a previous "best" candidate to use as a comparison for future candidates. This previous best will be defined as follows:
 
 \begin{enumerate}
-    \item Initial candidate solution is some random set of vertices $S^*$. This can also be the empty set. 
     \item Any new candidate solution $S$ such that the number of edges covered by the vertices in $S$ is greater than $S^*$ will be favoured.
     \item If candidate solution $S$ and $S^*$ cover the same number of edges, we choose the candidate solution with the lower number of vertices. Therefore $S^* \leftarrow S$ if $|S| < |S^*|$. 
 \end{enumerate}
 
-These are greedy and cover all cases and will ensure that any valid solution will always take precedence over an invalid one by point 2, as well as ensuring that any new valid solution with a lower number of vertices will be chosen by point 3. Any invalid candidate will only replace a previous invalid candidate if it covers more of the graph. If they cover the same number of edges, the candidate with less vertices is chosen.
+These are greedy and cover all cases and will ensure that any valid solution will always take precedence over an invalid one by point 1, as well as ensuring that any new valid solution with a lower number of vertices will be chosen by point 2. Any invalid candidate will only replace a previous invalid candidate if it covers more of the graph. If they cover the same number of edges, the candidate with less vertices is chosen.
+
+These two cases also cover the initial attempt for only allowing valid candidates. Valid candidates are always chosen if they have a smaller set size, and therefore in the case where invalid candidates are dissallowed, we can use these same principles. 
 
 This is a greedy approach for tracking invalid candidates, but once a valid candidate is chosen, it makes more sense to track the previously best seen valid candidate as the previous best rather than use an invalid candidate. This is not just for computing rewards, but also to ensure that once the agent terminates it's search, that the best candidate seen should always be a valid solution to the problem, regardless of whether it is the correct solution.
 
@@ -268,7 +280,7 @@ These three facts are important to note as it means the agent is intrinsically r
 
 As in ECO-DQN, rewards may become incredibly scarce as better and better valid candidates are found. Therefore, we will also give an intermediate reward of $\frac{1}{|V|}$ any time a new locally optimal state is found. In this case, a locally optimal state is one where $S$ is a valid solution and removing any vertex from $S$ results in a situation where $cover(S) < |E|$. As in ECO-DQN, this is to encourage exploration. Paired with the lack of negative reward (punishment) for leaving an optimal state, this should allow the agent to traverse out of local optimums into new ones.
 
-For the simplified version where we won't allow for invalid candidates, we'll instead add a negative reward equal to the number of uncovered edges, normalized by the number of edges. 
+For the simplified version where we won't allow for invalid candidates, we'll instead add a negative reward equal exactly one if the chosen vertex to change results in an invalid candidate. As such the reward will be $R(S) = max(0, |S^*| - |S|)$ in the case of a valid cover, and simply $R(S) = -1$ in the case where it suggests an invalid candidate. The reason for not normalizing this value is it doesn't matter the degree of which the solution is invalid in this case, and with everything else being normalized such that the values are all between zero and one, this will force the value down without being too disproportionate comparatively. 
 
 \subsection{Training}
 

@@ -171,7 +171,8 @@ class SpinSystemBase(ABC):
 
     def reset(self, spins=None):
         """
-        Explanation here
+        Resets the SpinSystem variables to initial conditions, i.e. random spins, current step 0, setting up the GraphGenerator,
+        resetting the graph observables, resetting the local rewards and so on.
         """
         self.current_step = 0
         if self.gg.biased:
@@ -182,45 +183,63 @@ class SpinSystemBase(ABC):
             self.matrix = self.gg.get()
         self._reset_graph_observables()
 
+        # Generates an array of 1s of size number of spins
         spinsOne = np.array([1] * self.n_spins)
-        local_rewards_available = self.get_immeditate_rewards_avaialable(spinsOne)
+        # Gets the array saying how much reward you get from flipping each vertex (i.e. the solution improvement)
+        local_rewards_available = self.get_immediate_rewards_available(spinsOne)
+        # Removes all zero values from that list
         local_rewards_available = local_rewards_available[np.nonzero(local_rewards_available)]
+        ### Because we chose every vertex, if there is no reward that means it's an invalid/empty graph for any problem where you partition
+        ### the graph. This may need to be changed for something like TSP, but that's a future problem.
         if local_rewards_available.size == 0:
             # We've generated an empty graph, this is pointless, try again.
             self.reset()
         else:
+            ## Maximum local reward is just the biggest of the local rewards
             self.max_local_reward_available = np.max(local_rewards_available)
 
+        ### Reset the state rewards and greedy actions available, definitely a better name for this function
         self.state = self._reset_state(spins)
         self.score = self.calculate_score()
 
         if self.reward_signal == RewardSignal.SINGLE:
             self.init_score = self.score
 
+        ### When resetting, the best score and best observed are just the current score
         self.best_score = self.score
         self.best_obs_score = self.score
+
+        ### Best spins is of course state[0, :self.n_spins] because that holds all the spin booleans similar to score
         self.best_spins = self.state[0, :self.n_spins].copy()
         self.best_obs_spins = self.state[0, :self.n_spins].copy()
 
+        ### Some memory setting that I don't need to worry about because it's just storing scores
         if self.memory_length is not None:
             self.score_memory = np.array([self.best_score] * self.memory_length)
             self.spins_memory = np.array([self.best_spins] * self.memory_length)
             self.idx_memory = 1
 
+        ### Reset graph observables, not really sure what matrix_obs or self.matrix are at the moment
         self._reset_graph_observables()
 
+        ### Keeps track of rewards for local minimums and punishments for stagnation
         if self.stag_punishment is not None or self.basin_reward is not None:
             self.history_buffer = HistoryBuffer()
 
         return self.get_observation()
 
     def _reset_graph_observables(self):
+        """
+        Resets the matrix of observations to be the same as the adjacency matrix, adding in case of extra actions and changing if the SpinSystem
+        is biased (i.e. a directed graph)
+        """
         # Reset observed adjacency matrix
         if self.extra_action != self.extra_action.NONE:
             # Pad adjacency matrix for disconnected extra-action spins of value 0.
             self.matrix_obs = np.zeros((self.matrix.shape[0] + 1, self.matrix.shape[0] + 1))
             self.matrix_obs [:-1, :-1] = self.matrix
         else:
+            ### TODO: Why is this same as adjacency matrix?
             self.matrix_obs = self.matrix
 
         # Reset observed bias vector,
@@ -232,6 +251,16 @@ class SpinSystemBase(ABC):
                 self.bias_obs = self.bias
 
     def _reset_state(self, spins=None):
+        """
+        The state's immediate reward and greedy actions get reset based on current spins selected
+        Note that for unreversible spins (i.e. S2V) all spins are set to 1 and can be flipped to -1 but for reversibles
+        the spins get set to a random value either 1 or -1. If a spin list is passed in, we format them to be signed.
+
+        Because of matrix multiplication being useful for computing max cut here, they format the spins to floats for parallelisation. 
+        """
+        # Array of all zeros observation_space shape x n_actions size
+        # Observation space is 7, actions being number of nodes.
+        # State is therefore a 7xN array? Update when known
         state = np.zeros((self.observation_space.shape[1], self.n_actions))
 
         if spins is None:
@@ -250,19 +279,24 @@ class SpinSystemBase(ABC):
         # 0 at this stage, we should use a 'for k,v in enumerate(self.observables)' loop.
         for idx, obs in self.observables:
             if obs==Observable.IMMEDIATE_REWARD_AVAILABLE:
-                state[idx, :self.n_spins] = self.get_immeditate_rewards_avaialable(spins=state[0, :self.n_spins]) / self.max_local_reward_available
+                ### Normalize the immediately available rewards by the maximum reward to get values between 1 and 0
+                state[idx, :self.n_spins] = self.get_immediate_rewards_available(spins=state[0, :self.n_spins]) / self.max_local_reward_available
             elif obs==Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE:
-                immeditate_rewards_avaialable = self.get_immeditate_rewards_avaialable(spins=state[0, :self.n_spins])
-                state[idx, :self.n_spins] = 1 - np.sum(immeditate_rewards_avaialable <= 0) / self.n_spins
+                immediate_rewards_avaialable = self.get_immediate_rewards_available(spins=state[0, :self.n_spins])
+                ### TODO: What in the world does this do
+                state[idx, :self.n_spins] = 1 - np.sum(immediate_rewards_avaialable <= 0) / self.n_spins
 
         return state
 
     def _get_spins(self, basis=SpinBasis.SIGNED):
+        ### State[0, :self.n_spins] seems to be a boolean mask for chosen vertices
+        ### Full state appears to be a list of the observations by index (0 is for spin state therefore spins gets that)
         spins = self.state[0, :self.n_spins]
 
         if basis == SpinBasis.SIGNED:
             pass
-        elif basis == SpinSystemBiased:
+        ### They had this as SpinSystemBiased which makes no sense so I changed it, should be fine
+        elif basis == SpinBasis.BINARY:
             # convert {1,-1} --> {0,1}
             spins[0, :] = (1 - spins[0, :]) / 2
         else:
@@ -270,6 +304,7 @@ class SpinSystemBase(ABC):
 
         return spins
 
+    ### TODO: NO IDEA WHAT THIS DOES
     def calculate_best_energy(self):
         if self.n_spins <= 10:
             # Generally, for small systems the time taken to start multiple processes is not worth it.
@@ -374,7 +409,7 @@ class SpinSystemBase(ABC):
         #############################################################################################
 
         self.state = new_state
-        immeditate_rewards_avaialable = self.get_immeditate_rewards_avaialable()
+        immediate_rewards_available = self.get_immediate_rewards_available()
 
         if self.score > self.best_obs_score:
             if self.reward_signal == RewardSignal.BLS:
@@ -399,7 +434,7 @@ class SpinSystemBase(ABC):
                 rew -= self.stag_punishment
 
         if self.basin_reward is not None:
-            if np.all(immeditate_rewards_avaialable <= 0):
+            if np.all(immediate_rewards_available <= 0):
                 # All immediate score changes are +ive <--> we are in a local minima.
                 if visiting_new_state:
                     # #####TEMP####
@@ -433,7 +468,7 @@ class SpinSystemBase(ABC):
 
             ### Local observables ###
             if observable==Observable.IMMEDIATE_REWARD_AVAILABLE:
-                self.state[idx, :self.n_spins] = immeditate_rewards_avaialable / self.max_local_reward_available
+                self.state[idx, :self.n_spins] = immediate_rewards_available / self.max_local_reward_available
 
             elif observable==Observable.TIME_SINCE_FLIP:
                 self.state[idx, :] += (1. / self.max_steps)
@@ -451,7 +486,7 @@ class SpinSystemBase(ABC):
                 self.state[idx, :] = max(0, ((self.current_step - self.max_steps) / self.horizon_length) + 1)
 
             elif observable==Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE:
-                self.state[idx, :] = 1 - np.sum(immeditate_rewards_avaialable <= 0) / self.n_spins
+                self.state[idx, :] = 1 - np.sum(immediate_rewards_available <= 0) / self.n_spins
 
             elif observable==Observable.DISTANCE_FROM_BEST_SCORE:
                 self.state[idx, :] = np.abs(self.score - self.best_obs_score) / self.max_local_reward_available
@@ -476,6 +511,10 @@ class SpinSystemBase(ABC):
         return (self.get_observation(), rew, done, None)
 
     def get_observation(self):
+        """
+        Returns the state and matrix of observations. Admittedly not sure what matrix of observations does yet. 
+        Stacks the state and matrix of observations vertically.
+        """
         state = self.state.copy()
         if self.spin_basis == SpinBasis.BINARY:
             # convert {1,-1} --> {0,1}
@@ -486,7 +525,12 @@ class SpinSystemBase(ABC):
         else:
             return np.vstack((state, self.matrix_obs))
 
-    def get_immeditate_rewards_avaialable(self, spins=None):
+    def get_immediate_rewards_available(self, spins=None):
+        """
+        Returns the list of immediate rewards available given the spins. For example, for the maximum cut this returns the list of 
+        rewards (i.e. new cut values) for each vertex if flipped. Note that positive values are good, so for minimization problems these
+        functions should return positive values for improved (smaller) solutions.
+        """
         if spins is None:
             spins = self._get_spins()
 
@@ -494,6 +538,8 @@ class SpinSystemBase(ABC):
             immediate_reward_function = lambda *args: -1*self._get_immeditate_energies_avaialable_jit(*args)
         elif self.optimisation_target==OptimisationTarget.CUT:
             immediate_reward_function = self._get_immeditate_cuts_avaialable_jit
+        elif self.optimisation_target == OptimisationTarget.MVC:
+            immediate_reward_function = self._get_immediate_vertex_covers_available
         else:
             raise NotImplementedError("Optimisation target {} not recognised.".format(self.optimisation_ta))
 
@@ -507,6 +553,11 @@ class SpinSystemBase(ABC):
             return immediate_reward_function(spins,matrix)
 
     def get_allowed_action_states(self):
+        """
+        Gets the allowed actions, either (0, 1) or (1, -1).
+        For irreversible ones it's only 0 or 1. Note that for binary basis (0, 1), 1 is considered the default state and -1 is considered
+        the default state for signed basis. 
+        """
         if self.reversible_spins:
             # If MDP is reversible, both actions are allowed.
             if self.spin_basis == SpinBasis.BINARY:
@@ -521,10 +572,15 @@ class SpinSystemBase(ABC):
                 return 1
 
     def calculate_score(self, spins=None):
+        """
+        Calculates the score given the current spin states depending on the optimization target
+        """
         if self.optimisation_target==OptimisationTarget.CUT:
             score = self.calculate_cut(spins)
         elif self.optimisation_target==OptimisationTarget.ENERGY:
             score = -1.*self.calculate_energy(spins)
+        elif self.optimisation_target==OptimisationTarget.MVC:
+            score = self.calculate_mvc(spins)
         else:
             raise NotImplementedError
         return score
@@ -534,6 +590,8 @@ class SpinSystemBase(ABC):
             delta_score = self._calculate_cut_change(new_spins, matrix, action)
         elif self.optimisation_target == OptimisationTarget.ENERGY:
             delta_score = -1. * self._calculate_energy_change(new_spins, matrix, action)
+        elif self.optimisation_target == OptimisationTarget.MVC:
+            delta_score = self._calculate_mvc_change(new_spins, matrix, action)
         else:
             raise NotImplementedError
         return delta_score
@@ -556,6 +614,10 @@ class SpinSystemBase(ABC):
     @abstractmethod
     def calculate_cut(self, spins=None):
         raise NotImplementedError
+    
+    @abstractmethod
+    def calculate_mvc(self, spins=None):
+        raise NotImplementedError
 
     @abstractmethod
     def get_best_cut(self):
@@ -571,6 +633,10 @@ class SpinSystemBase(ABC):
 
     @abstractmethod
     def _calculate_cut_change(self, new_spins, matrix, action):
+        raise NotImplementedError
+    
+    @abstractmethod
+    def _calculate_mvc_change(self, new_spins, matrix, action):
         raise NotImplementedError
 
 ##########
@@ -590,6 +656,9 @@ class SpinSystemUnbiased(SpinSystemBase):
         return self._calculate_energy_jit(spins, matrix)
 
     def calculate_cut(self, spins=None):
+        """
+        Calculate the cut value given the spins chosen
+        """
         if spins is None:
             spins = self._get_spins()
         else:
@@ -602,6 +671,16 @@ class SpinSystemUnbiased(SpinSystemBase):
             return self.best_score
         else:
             raise NotImplementedError("Can't return best cut when optimisation target is set to energy.")
+        
+    def calculate_mvc(self, spins = None):
+        """
+        Calculate the size of the current cover regardless of validity. 
+        """
+        if spins is None:
+            spins = self._get_spins()
+        
+        ### TODO: There's probably an extra check I need to make here to check if the spins are -1 and 1 or 0 and 1
+        return np.count_nonzero(spins)
 
     def _calc_over_range(self, i0, iMax):
         list_spins = [2 * np.array([int(x) for x in list_string]) - 1
@@ -620,6 +699,11 @@ class SpinSystemUnbiased(SpinSystemBase):
     @jit(float64(float64[:],float64[:,:],int64), nopython=True)
     def _calculate_cut_change(new_spins, matrix, action):
         return -1 * new_spins[action] * matmul(new_spins.T, matrix[:, action])
+    
+    @staticmethod
+    def _calculate_mvc_change(new_spins, matrix, action):
+        ### Not sure what this gives yet, will have to verify with debugger
+        return None
 
     @staticmethod
     @jit(float64(float64[:],float64[:,:]), nopython=True)
@@ -650,6 +734,11 @@ class SpinSystemUnbiased(SpinSystemBase):
     @jit(float64[:](float64[:],float64[:,:]), nopython=True)
     def _get_immeditate_cuts_avaialable_jit(spins, matrix):
         return spins * matmul(matrix, spins)
+    
+    @staticmethod
+    def _get_immediate_vertex_covers_available(spins, matrix):
+        ### Get the immediately available vertex covers that are valid
+        return spins
 
 class SpinSystemBiased(SpinSystemBase):
 

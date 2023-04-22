@@ -28,6 +28,7 @@ class OptimisationTarget(Enum):
 
     CUT = 1
     ENERGY = 2
+    MVC = 3
 
 class SpinBasis(Enum):
 
@@ -36,16 +37,21 @@ class SpinBasis(Enum):
 
 class Observable(Enum):
     # Local observations that differ between nodes.
-    SPIN_STATE = 1
-    IMMEDIATE_REWARD_AVAILABLE = 2
-    TIME_SINCE_FLIP = 3
+    SPIN_STATE = 1 # The state of vertices
+    IMMEDIATE_REWARD_AVAILABLE = 2 # The immediate reward if the current vertex is changed
+    TIME_SINCE_FLIP = 3 # The number of steps since the vertex was changed
 
     # Global observations that are the same for all nodes.
-    EPISODE_TIME = 4
-    TERMINATION_IMMANENCY = 5
-    NUMBER_OF_GREEDY_ACTIONS_AVAILABLE = 6
-    DISTANCE_FROM_BEST_SCORE = 7
-    DISTANCE_FROM_BEST_STATE = 8
+    EPISODE_TIME = 4 # The current duration of the episode
+    TERMINATION_IMMANENCY = 5 # Number of steps until termination
+    NUMBER_OF_GREEDY_ACTIONS_AVAILABLE = 6 # Number of actions that immediately increase the reward
+    DISTANCE_FROM_BEST_SCORE = 7 # Difference between best score and current
+    DISTANCE_FROM_BEST_STATE = 8 # Distance from best set to current
+
+    # Observations for problems with invalid solutions
+    IMMEDIATE_VALIDITY_DIFFERENCE = 9 # Immediate change in how much closer to a valid candidate the current state is on flip
+    GLOBAL_VALIDITY_DIFFERENCE = 10 # Difference between validity of best seen to current
+    VALIDITY_BIT = 11 # Whether the current state is a valid one
 
 DEFAULT_OBSERVABLES = [Observable.SPIN_STATE,
                        Observable.IMMEDIATE_REWARD_AVAILABLE,
@@ -54,6 +60,26 @@ DEFAULT_OBSERVABLES = [Observable.SPIN_STATE,
                        Observable.DISTANCE_FROM_BEST_STATE,
                        Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE,
                        Observable.TERMINATION_IMMANENCY]
+
+# Don't use immediate reward available because it's implied from the spin state with MVC because it's just +1 or -1
+VALID_MVC_OBSERVABLES = [Observable.SPIN_STATE,
+                        Observable.TIME_SINCE_FLIP,
+                        Observable.DISTANCE_FROM_BEST_SCORE,
+                        Observable.DISTANCE_FROM_BEST_STATE,
+                        Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE,
+                        Observable.TERMINATION_IMMANENCY]
+
+# When invalid states are available for choosing, add observables
+MVC_OBSERVABLES = [Observable.SPIN_STATE,
+                   Observable.TIME_SINCE_FLIP,
+                   Observable.DISTANCE_FROM_BEST_SCORE,
+                   Observable.DISTANCE_FROM_BEST_STATE,
+                   Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE,
+                   Observable.TERMINATION_IMMANENCY,
+                   Observable.IMMEDIATE_VALIDITY_DIFFERENCE,
+                   Observable.GLOBAL_VALIDITY_DIFFERENCE,
+                   Observable.VALIDITY_BIT]
+
 
 class GraphGenerator(ABC):
 
