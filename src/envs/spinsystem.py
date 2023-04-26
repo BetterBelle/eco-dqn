@@ -239,7 +239,7 @@ class SpinSystemBase(ABC):
             self.matrix_obs = np.zeros((self.matrix.shape[0] + 1, self.matrix.shape[0] + 1))
             self.matrix_obs [:-1, :-1] = self.matrix
         else:
-            ### TODO: Why is this same as adjacency matrix?
+            
             self.matrix_obs = self.matrix
 
         # Reset observed bias vector,
@@ -283,7 +283,9 @@ class SpinSystemBase(ABC):
                 state[idx, :self.n_spins] = self.get_immediate_rewards_available(spins=state[0, :self.n_spins]) / self.max_local_reward_available
             elif obs==Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE:
                 immediate_rewards_avaialable = self.get_immediate_rewards_available(spins=state[0, :self.n_spins])
-                ### TODO: What in the world does this do
+                ### Every value number of greedy actions available is count of every immediate reward normalized by num vertices
+                ### NOTE: 1 - resulting value gives the inverse of rewards <= 0, so the positive rewards
+                ### CONSIDER CHANGING THIS TO MAKE MORE SENSE np.sum(immediate_rewards_availalable > 0) / self.n_spins
                 state[idx, :self.n_spins] = 1 - np.sum(immediate_rewards_avaialable <= 0) / self.n_spins
 
         return state
