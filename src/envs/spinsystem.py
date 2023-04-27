@@ -285,7 +285,6 @@ class SpinSystemBase(ABC):
                 immediate_rewards_avaialable = self.get_immediate_rewards_available(spins=state[0, :self.n_spins])
                 ### Every value number of greedy actions available is count of every immediate reward normalized by num vertices
                 ### NOTE: 1 - resulting value gives the inverse of rewards <= 0, so the positive rewards
-                ### CONSIDER CHANGING THIS TO MAKE MORE SENSE np.sum(immediate_rewards_availalable > 0) / self.n_spins
                 state[idx, :self.n_spins] = 1 - np.sum(immediate_rewards_avaialable <= 0) / self.n_spins
 
         return state
@@ -437,7 +436,7 @@ class SpinSystemBase(ABC):
 
         if self.basin_reward is not None:
             if np.all(immediate_rewards_available <= 0):
-                # All immediate score changes are +ive <--> we are in a local minima.
+                # All immediate score changes are negative <--> we are in a local minima.
                 if visiting_new_state:
                     # #####TEMP####
                     # if self.reward_signal != RewardSignal.BLS or (self.score > self.best_obs_score):
