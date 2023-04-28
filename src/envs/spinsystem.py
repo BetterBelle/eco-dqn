@@ -195,7 +195,7 @@ class SpinSystemBase(ABC):
             # We've generated an empty graph, this is pointless, try again.
             self.reset()
         else:
-            ## Maximum local reward is just the biggest of the local rewards
+            ## Maximum local reward is just the biggest of the local rewards from the initial state of all 1s
             self.max_local_reward_available = np.max(local_rewards_available)
 
         ### Reset the state rewards and greedy actions available, definitely a better name for this function

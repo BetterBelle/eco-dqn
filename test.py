@@ -21,6 +21,9 @@ def number_of_uncovered_edges(matrix, spins):
     
     return np.sum(matrix * (spins == 1) * np.array([spins == 1]).T) / 2 - spins * np.matmul(matrix * (spins == 1), spins)
 
+def _get_immeditate_cuts_avaialable_jit(spins, matrix):
+    return spins * np.matmul(matrix, spins)
+
 adjacency_matrix = np.array([
     [0, 0, 1, 0, 1, 1],
     [0, 0, 0, 0, 1, 1],
@@ -33,6 +36,7 @@ chosen_nodes = np.array([1, 1, 1, -1, -1, -1])
 
 
 full = number_of_uncovered_edges(adjacency_matrix, np.array(chosen_nodes))
+print(_get_immeditate_cuts_avaialable_jit(chosen_nodes, adjacency_matrix))
 print(adjacency_matrix)
 print(full)
 
@@ -43,5 +47,5 @@ graph = nx.Graph(adjacency_matrix)
 # np.put(chosen_cover, list(cover), 1)
 # other = nx.Graph(full)
 # nx.draw_networkx(full)
-# nx.draw_networkx(graph)
-# plt.show()
+nx.draw_networkx(graph)
+plt.show()
