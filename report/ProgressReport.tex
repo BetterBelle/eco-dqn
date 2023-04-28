@@ -1,4 +1,5 @@
 \documentclass{article}
+\usepackage{amsmath}
 
 \title{Progress Report}
 \author{Annabelle Cloutier}
@@ -116,7 +117,7 @@ These ideas are replicated in the training of ECO-DQN. For every episode in the 
 
 \subsubsection{Reward Shaping}
 
-The reward for in a certain state is given by the difference between the cut value in that state and the highest cut value seen so far in the episode, divided by the number of vertices. If the difference is negative, it's instead set to 0. The justification behind this choice is that a negative reward will discourage the agent from exploring states that give an immediately worse cut value, even if other cuts including that change later on may give better cut values. If this were to happen, it would discourage the agent from exploring different cut values and cause it to stay in a very small space near a locally maximal cut value. Because previously seen optimal states are stored in memory, it's beneficial to later let the agent explore more states in an attempt to find more locally optimal states, even if not always better than the previously seen local optimum.
+The reward in a certain state is given by the difference between the cut value in that state and the highest cut value seen so far in the episode, divided by the number of vertices. If the difference is negative, it's instead set to 0. The justification behind this choice is that a negative reward will discourage the agent from exploring states that give an immediately worse cut value, even if other cuts including that change later on may give better cut values. If this were to happen, it would discourage the agent from exploring different cut values and cause it to stay in a very small space near a locally maximal cut value. Because previously seen optimal states are stored in memory, it's beneficial to later let the agent explore more states in an attempt to find more locally optimal states, even if not always better than the previously seen local optimum.
 
 They also define a reward for reaching locally optimal states of $\frac{1}{|V|}$. This is once again to encourage exploration. Because the previously seen best cut is stored, it's beneficial for the agent to explore other states, even if other local optimums may be worse than the previously found best cut. They state that local optima in combinatorial problems are typically close to each other and therefore by giving rewards for reaching new local optimums, the agent learns to hop between them during training as it is rewarded for this behaviour. Without this, they state that because there are far too many states to be visited in a finite time, which is typical for combinatorial optimization problems, it is therefore useful to focus on these subsets of states near local optimums.
 
@@ -126,7 +127,7 @@ The choice to not randomly change states when a new local optimum is found appea
 
 They demonstrate this behaviour by observing the probability during any given timestep that the agent will either revisit a state, find a locally optimal state or find the maximum cut on the validation set. They show that as the number of timesteps goes up, the probability that the agent revisits a state goes up, as does the probability of finding the maximum cut, while the probability that the agent finds a local optimum goes up very quickly and stabilizes for the rest of the time steps, showing that the agent picks a certain set of local optimum and explores that space by revisiting previously seen states.
 
-\textit{One thing this paper does not tackle is the issue of invalid solution states and how this would affect reward shaping, especially in a situation where the agent would be allowed to revert previously made actions. This isn't necessary for the Maximum Cut Problem, as any partition of the graph into two containing all vertices is a valid cut, but problems like the Traveling Salesman, Minimum Vertex Cover, Minimum Bisection or Bin Packing Problem could possibly include states that are not valid solutions by either not being a complete path, not covering every vertex, having two sets of different sizes or having items that are not in a bin, respectively for each problem.}
+One thing this paper does not tackle is the issue of invalid solution states and how this would affect reward shaping, especially in a situation where the agent would be allowed to revert previously made actions. This isn't necessary for the Maximum Cut Problem, as any partition of the graph into two containing all vertices is a valid cut, but problems like the Traveling Salesman, Minimum Vertex Cover, Minimum Bisection  could possibly include states that are not valid solutions by either not being a complete path, not covering every vertex, having two sets of different sizes or having items that are not in a bin, respectively for each problem.
 
 \subsection{Discussion on Generalization}
 
@@ -238,7 +239,7 @@ In this case as with ECO-DQN \cite{eco-dqn}, we have local (1-3, 7) and global (
 
 To start, we'll do a basic algorithm to select edges at random, picking the nodes incident on the edge and removing all edges incident on the chosen nodes until all edges are covered. We will then use this generated solution and give it to the agent as a starting point. In this scenario, we won't allow for invalid candidates, and will give a large negative reward for choosing invalid candidates. If an invalid choice is suggested during test time, we'll generate another random valid solution and get the network to continue from the newly generated solution. 
 
-Where we'll allow for invalid candidates, we'll generate a random candidate as the starting point, irrespective of validity.
+Where we'll allow for invalid candidates, we'll start with an empty solution set as the first candidate.
 
 \subsection{Reward Shaping}
 
@@ -246,57 +247,69 @@ Due to the difference between how proposed solutions are going to be in the Maxi
 
 In ECO-DQN \cite{eco-dqn}, the reward for a certain state is framed as
 
-$R(S) = max(0, C(S) - C(S*))$
+$R(S) = max(0, C(S) - C(S^*)) / |V|$
 
-where $C(S)$ is the cut value for state $S$ and $S*$ will be the previously best seen cut value. They also grant intermediate rewards $\frac{1}{|V|}$ any time a locally optimal cut is found, which is a cut where any change to a vertex reduces the value of the cut.
+where $C(S)$ is the cut value for state $S$ and $S^*$ will be the previously best seen cut value. They also grant intermediate rewards $\frac{1}{|V|}$ any time a new locally optimal cut is found, which is a cut that has not yet been seen where any change to a vertex reduces the value of the cut.
 
-In S2V-DQN \cite{s2v-dqn}, the reward for a Minimum Vertex Cover they define as $R(S, v) = -|S| - -|S'|$ being the change in their cost function when going from state $S$ and adding vertex $v$ to it, resulting in state $S'$. In these cases, the state is the set of vertices chosen for a candidate solution. We can reformulate their idea slightly to coincide with the idea in ECO-DQN to allow for exploration by instead looking only at defining the reward on a specific state in comparison to the best seen.
+In S2V-DQN \cite{s2v-dqn}, the reward for a Minimum Vertex Cover they define as $R(S, v) = -|S| - -|S'|$ being the change in their cost function when going from state $S$ and adding vertex $v$ to it, resulting in state $S'$. In these cases, the state is the set of vertices chosen for a candidate solution. We can reformulate their idea slightly to coincide with the idea in ECO-DQN to allow for exploration by instead looking only at defining the reward on a specific state in comparison to the best seen. 
 
-In our case, the best seen is not so simply defined. Because constructed candidates may not be valid, some way to compare invalid candidates to valid ones has to be devised such that we can choose a previous "best" candidate to use as a comparison for future candidates. This previous best will be defined as follows:
+In our case, the best seen is not so simply defined. Because constructed candidates may not be valid, some way to compare invalid candidates to valid ones has to be devised such that we can choose a previous "best" candidate to use as a comparison for future candidates. What we want is a reward mechanism that allows valid candidates to always be chosen as the best over invalid ones, as well as for valid candidates to be compared to each other in such a way that a candidate that improves the solution gives a better reward than ones that don't. Similarly for invalid candidates, we'd like for them to be compared to each other in such a way that an invalid candidate that is closer in some measure to being a valid solution gives a better reward than one that is further away. One way to do this is to ensure that valid solutions gives positive rewards increasing in magnitude depending on it's quality, and for invalid solutions to give negative rewards increasing in magnitude depending on it's relative lack of closeness to being a valid candidate.
+
+With this in mind, we can define this idea of the "score" of a candidate solution. This score will be used to compare different candidates in the same way that is done in ECO-DQN so valid solutions will always be prioritized. This score function is defined as follows:
+
+$SC(S) = V(S) * SQ(S) - DI(S)$
+
+$SC(S)$ is the score of the solution that will be used to compare it to other solutions, and more importantly the previous best seen for determining whether this new solution should take precedence as the new best seen and for calculation for the reward. This can also be used to determine whether we are in a local minimum. $V(S)$ is a validity bit. Therefore $V(S)$ is defined as follows:
+
+\[
+    V(S) =
+    \begin{cases}
+        1,&\text{if S is a valid candidate}\\
+        0,&\text{otherwise}
+    \end{cases}
+\]
+
+$SQ(S)$ is a function defining the value of a solution such that it is larger for a better solution. Intuitively this is the solution's quality. For the Minimum Vertex Cover, this would be the number of vertices not in the cover, $SQ(S) = |V| - |S|$. This way a smaller solution set will have a larger score.
+
+$DI(S)$ is the degree of invalidity. This function should be larger the farther away from a valid solution the candidate is. This function should always evaluate to zero for a valid candidate. For the Minimum Vertex Cover, this degree of invalidity can be easily defined by counting the number of edges not covered by the candidate solution. Therefore for the Minimum Vertex Cover, $DI(S) = UncoveredEdges(S)$. 
+
+This score function guarantees that valid solutions have a positive score by making it the only existing term and also guarantees that invalid solutions are granted negative scores by ignoring the solution's quality by the validity bit and increasing the magnitude for solutions that require more actions to render valid. 
+
+For computing a reward, we'll use the normalized $SQ(S)$ and $DI(S)$ functions, $NormSQ(S)$ and $NormDI(S)$ where we normalize each to be bounded in $[0, 1]$. For the Minimum Vertex Cover this means dividing by the number of vertices in the graph and for $DI(S)$ we divide by the number of edges in the graph. This new function is $NormSC(S) = V(S) * NormSQ(S) - NormDI(S)$. Therefore we can define the reward in much the same way as DQN:
+
+$R(S) = max(0, NormSC(S) - NormSC(S^*))$
+
+Note that for the maximum cut, this evaluates to the same function used in ECO-DQN because $DI(S) = 0$ and $V(S) = 1$ for the maximum cut. However, this new score function allows us to tackle other problems that have more constraints. This function also allows us to easily find local optimums as the score for flipping other states when compared to a local optimum will always give a negative or zero reward if no better valid solutions are able to be found with one action. The term comparing the normalized scores should also guarantee the following:
 
 \begin{enumerate}
-    \item Any new candidate solution $S$ such that the number of edges covered by the vertices in $S$ is greater than $S^*$ will be favoured.
-    \item If candidate solution $S$ and $S^*$ cover the same number of edges, we choose the candidate solution with the lower number of vertices. Therefore $S^* \leftarrow S$ if $|S| < |S^*|$. 
+    \item Invalid $S$ compared to invalid $S^*$ only give positive rewards when $S$ is closer to being valid than $S^*$. 
+    \item Invalid $S$ compared to valid $S^*$ will never give a positive reward. 
+    \item Valid $S$ compared to invalid $S^*$ will always give a positive reward. 
+    \item Valid $S$ compared to valid $S^*$ will only give positive rewards if $S$ is a better solution than $S^*$. 
 \end{enumerate}
 
-These are greedy and cover all cases and will ensure that any valid solution will always take precedence over an invalid one by point 1, as well as ensuring that any new valid solution with a lower number of vertices will be chosen by point 2. Any invalid candidate will only replace a previous invalid candidate if it covers more of the graph. If they cover the same number of edges, the candidate with less vertices is chosen.
+This is true for the way we defined our function with the Minimum Vertex Cover. One thing to note is that defining how close we are to a valid solution can be a difficult problem if we define it as the minimum number of actions required to get to a valid state; for the Minimum Vertex Cover, having 2 uncovered edges may only require one action to solve, but could also require two actions to solve depending on the state of the solution set. However, determining the minimum number of actions required to get to a valid solution is just solving the problem excluding the current nodes in the set. Therefore some compromise has to be made. This problem does not exist in the Minimum Bisection for example, where we simply measure the size difference between the two sets, which gives a direct measure for how many actions are required to make a valid solution.
 
-These two cases also cover the initial attempt for only allowing valid candidates. Valid candidates are always chosen if they have a smaller set size, and therefore in the case where invalid candidates are dissallowed, we can use these same principles. 
+Further, because we're once again using this maximum function, this means the agent doesn't get punished for exploring worse states. This reward function will actually evaluate valid and invalid candidate solutions during exploration evenly when the best observed is a local optimum, meaning it can explore in either direction to find new valid candidates. 
 
-This is a greedy approach for tracking invalid candidates, but once a valid candidate is chosen, it makes more sense to track the previously best seen valid candidate as the previous best rather than use an invalid candidate. This is not just for computing rewards, but also to ensure that once the agent terminates it's search, that the best candidate seen should always be a valid solution to the problem, regardless of whether it is the correct solution.
+As with ECO-DQN, we'll also give intermediate rewards for finding new local optimums in order to avoid situations where rewards become incredibly scarce and to encourage it to find new locally optimal states to explore. 
 
-As for the reward, we can define this in a similar way as S2V-DQN, with a modification: $R(S) = max(0, |S^*| - |S|) + max(0, cover(S) - cover(S^*))$. This idea is similar to S2V-DQN but instead uses the idea of comparing the current candidate to the previous best, and without punishing the agent for choosing covers of larger magnitude to allow for exploration as explained in ECO-DQN. We also add a term for comparing covers, which we define as the number of edges covered by the vertices in $S$. This is to reward the network for choosing candidates that cover more edges up until it finds a valid candidate. Each of these will be normalized by the number of vertices for the case of set size and by the number of edges for the cover, to avoid disproportionate reward structures on different graph topologies. 
+For the version of this algorithm where we won't allow for invalid candidates, we'll use this same reward function during training and testing. However, during both, we'll start from a valid candidate and if invalid candidates are suggested, we'll randomize into a new valid candidate. 
 
-Some things to note:
-
-\begin{itemize}
-    \item If $S^*$ is a valid candidate, the only candidates that give rewards greater than 0 are new valid candidates that are better, or invalid candidates with a smaller number of vertices. This is due to the second term of the reward being 0 in any case once a valid candidate is found.
-    \item If $S^*$ is an invalid candidate, any valid candidate always gives a reward greater than 0 because any valid candidate $S$ would necessarily have $cover(S) > cover(S^*)$. 
-    \item If $S^*$ is an invalid candidate, any invalid candidate always gives a reward greater than zero so long as it has a smaller set size, a larger cover, or both.
-    \item Neither point 2 or 3 are necessarily favoured over the other. That is to say, valid candidates do not always give greater rewards than invalid ones, meaning the reward isn't purely greedy.
-\end{itemize}
-
-These three facts are important to note as it means the agent is intrinsically rewarded for having a lower number of vertices in a candidate solution even when $S^*$ is a valid candidate, therefore giving the agent incentive to explore invalid candidates in search for better valid ones.
-
-As in ECO-DQN, rewards may become incredibly scarce as better and better valid candidates are found. Therefore, we will also give an intermediate reward of $\frac{1}{|V|}$ any time a new locally optimal state is found. In this case, a locally optimal state is one where $S$ is a valid solution and removing any vertex from $S$ results in a situation where $cover(S) < |E|$. As in ECO-DQN, this is to encourage exploration. Paired with the lack of negative reward (punishment) for leaving an optimal state, this should allow the agent to traverse out of local optimums into new ones.
-
-For the simplified version where we won't allow for invalid candidates, we'll instead add a negative reward equal exactly one if the chosen vertex to change results in an invalid candidate. As such the reward will be $R(S) = max(0, |S^*| - |S|)$ in the case of a valid cover, and simply $R(S) = -1$ in the case where it suggests an invalid candidate. The reason for not normalizing this value is it doesn't matter the degree of which the solution is invalid in this case, and with everything else being normalized such that the values are all between zero and one, this will force the value down without being too disproportionate comparatively. 
+The last thing of note is that this reward system also allows us to represent S2V-DQN in the same way and disallowing exploration by starting with an empty candidate and progressively building up the solution, not allowing the network to undo a previously flipped vertex. This means the previously seen optimum will always be the previous state. In our case, the reward at each step is based on how many more edges get covered by the new state instead of only giving the same reward at each step. This may seem greedy and like it would give the same cumulative reward because all valid covers will give the same cumulative reward if you're only counting edges. However, because the end result is a valid solution, the function completely changes in the final step and the cumulative reward will be larger for finding better covers. Therefore, by having a larger reward horizon in the Q function evaluation, which the ECO-DQN paper already does with a $\gamma$ of 0.95, we can guide the network to prefer future rewards more, meaning it will be more likely to prefer smaller covers as it gets more reward for this behavior in the long term. An added benefit of this is that if the function approximation that the network generates is accurate, these larger rewards should be closer to the initial empty candidate and should therefore be easier to find. 
 
 \subsection{Training}
 
-Training this network will be algorithmically identical to ECO-DQN using the ideas from Deep Q-Learning described in \textit{Mnih et al.} \cite{deepmind_2015}
+Training this network will be algorithmically identical to ECO-DQN using the ideas from Deep Q-Learning described in \textit{Mnih et al.} \cite{deepmind_2015}.
 
 \subsection{Implementation and Results}
 
 Notes for when I start implementation: 
 
 \begin{itemize}
-    \item src/envs/utils.py defines an enum Observations for maximum cut oberservations. Create a new one for Min Vertex Cover. This does not include calculations
-    \item src/envs/spinsystem.py defines the operations on a graph required for the Maximum Cut in SpinSystemBase, an abstract class. 
-    \item methods for SpinSystemBase could likely be overwritten in a new class for MVC. The step() method contains information for computing observations AND reward. This is where attention should be focused to create the new class that mimics behavior to minimize the amount of code I need to copy (like the entire MPNN which I don't yet need to modify)
-    \item Consider making test graphs with some known answers for observations and rewards that can be confirmed to ensure code is bug free before moving forward. (i.e. unit tests)
     \item Still need to find Integer Program for comparison. Do this last. It's useless to have one if I can't even get the above working.
     \item Start with basics: do basic solution of MVC then use the network to refine (i.e. don't allow invalids)
+    \item Because of the generalized nature of it all, consider training on max cut/min cover and then testing on the different problem to see how well the network generalizes. 
 \end{itemize}
 
 \subsection{Generalization}
