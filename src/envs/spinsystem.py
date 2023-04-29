@@ -305,54 +305,54 @@ class SpinSystemBase(ABC):
 
         return spins
 
-    ### TODO: NO IDEA WHAT THIS DOES
-    def calculate_best_energy(self):
-        if self.n_spins <= 10:
-            # Generally, for small systems the time taken to start multiple processes is not worth it.
-            res = self.calculate_best_brute()
+    ### NOTE: NOT CALLED ANYWHERE?
+    # def calculate_best_energy(self):
+    #     if self.n_spins <= 10:
+    #         # Generally, for small systems the time taken to start multiple processes is not worth it.
+    #         res = self.calculate_best_brute()
 
-        else:
-            # Start up processing pool
-            n_cpu = int(mp.cpu_count()) / 2
+    #     else:
+    #         # Start up processing pool
+    #         n_cpu = int(mp.cpu_count()) / 2
 
-            pool = mp.Pool(mp.cpu_count())
+    #         pool = mp.Pool(mp.cpu_count())
 
-            # Split up state trials across the number of cpus
-            iMax = 2 ** (self.n_spins)
-            args = np.round(np.linspace(0, np.ceil(iMax / n_cpu) * n_cpu, n_cpu + 1))
-            arg_pairs = [list(args) for args in zip(args, args[1:])]
+    #         # Split up state trials across the number of cpus
+    #         iMax = 2 ** (self.n_spins)
+    #         args = np.round(np.linspace(0, np.ceil(iMax / n_cpu) * n_cpu, n_cpu + 1))
+    #         arg_pairs = [list(args) for args in zip(args, args[1:])]
 
-            # Try all the states.
-            #             res = pool.starmap(self._calc_over_range, arg_pairs)
-            try:
-                res = pool.starmap(self._calc_over_range, arg_pairs)
-                # Return the best solution,
-                idx_best = np.argmin([e for e, s in res])
-                res = res[idx_best]
-            except Exception as e:
-                # Falling back to single-thread implementation.
-                # res = self.calculate_best_brute()
-                res = self._calc_over_range(0, 2 ** (self.n_spins))
-            finally:
-                # No matter what happens, make sure we tidy up after outselves.
-                pool.close()
+    #         # Try all the states.
+    #         #             res = pool.starmap(self._calc_over_range, arg_pairs)
+    #         try:
+    #             res = pool.starmap(self._calc_over_range, arg_pairs)
+    #             # Return the best solution,
+    #             idx_best = np.argmin([e for e, s in res])
+    #             res = res[idx_best]
+    #         except Exception as e:
+    #             # Falling back to single-thread implementation.
+    #             # res = self.calculate_best_brute()
+    #             res = self._calc_over_range(0, 2 ** (self.n_spins))
+    #         finally:
+    #             # No matter what happens, make sure we tidy up after outselves.
+    #             pool.close()
 
-            if self.spin_basis == SpinBasis.BINARY:
-                # convert {1,-1} --> {0,1}
-                best_score, best_spins = res
-                best_spins = (1 - best_spins) / 2
-                res = best_score, best_spins
+    #         if self.spin_basis == SpinBasis.BINARY:
+    #             # convert {1,-1} --> {0,1}
+    #             best_score, best_spins = res
+    #             best_spins = (1 - best_spins) / 2
+    #             res = best_score, best_spins
 
-            if self.optimisation_target == OptimisationTarget.CUT:
-                best_energy, best_spins = res
-                best_cut = self.calculate_cut(best_spins)
-                res = best_cut, best_spins
-            elif self.optimisation_target == OptimisationTarget.ENERGY:
-                pass
-            else:
-                raise NotImplementedError()
+    #         if self.optimisation_target == OptimisationTarget.CUT:
+    #             best_energy, best_spins = res
+    #             best_cut = self.calculate_cut(best_spins)
+    #             res = best_cut, best_spins
+    #         elif self.optimisation_target == OptimisationTarget.ENERGY:
+    #             pass
+    #         else:
+    #             raise NotImplementedError()
 
-        return res
+    #     return res
 
     def seed(self, seed):
         return self.seed
@@ -478,6 +478,9 @@ class SpinSystemBase(ABC):
                 else:
                     self.state[idx, action] = 0
 
+            elif observable==Observable.IMMEDIATE_VALIDITY_DIFFERENCE:
+                pass
+
             ### Global observables ###
             elif observable==Observable.EPISODE_TIME:
                 self.state[idx, :] += (1. / self.max_steps)
@@ -494,6 +497,13 @@ class SpinSystemBase(ABC):
 
             elif observable==Observable.DISTANCE_FROM_BEST_STATE:
                 self.state[idx, :self.n_spins] = np.count_nonzero(self.best_obs_spins[:self.n_spins] - self.state[0, :self.n_spins])
+
+            elif observable==Observable.GLOBAL_VALIDITY_DIFFERENCE:
+                pass
+
+            elif observable==Observable.VALIDITY_BIT:
+                pass
+
 
         #############################################################################################
         # 4. Check termination criteria.                                                            #

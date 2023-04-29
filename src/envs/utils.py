@@ -28,7 +28,7 @@ class OptimisationTarget(Enum):
 
     CUT = 1
     ENERGY = 2
-    MVC = 3
+    MIN_COVER = 3
 
 class SpinBasis(Enum):
 
