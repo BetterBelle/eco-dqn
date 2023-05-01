@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 
+from src.envs.spinsystem import SpinSystemBase
 import numpy as np
 import torch
 
 class SpinSolver(ABC):
     """Abstract base class for agents solving SpinSystem Ising problems."""
 
-    def __init__(self, env, record_cut=False, record_rewards=False, record_qs=False, verbose=False):
+    def __init__(self, env : SpinSystemBase, record_cut=False, record_rewards=False, record_qs=False, verbose=False):
         """Base initialisation of a SpinSolver.
 
         Args:
@@ -96,7 +97,7 @@ class Greedy(SpinSolver):
             done (bool): Whether the environment is in a terminal state after
                 the action is taken.
         """
-        rewards_avaialable = self.env.get_immeditate_rewards_avaialable()
+        rewards_avaialable = self.env.get_immediate_rewards_available()
 
         if self.env.reversible_spins:
             action = rewards_avaialable.argmax()
@@ -209,7 +210,7 @@ class Network(SpinSolver):
             if self.record_qs:
                 record += [qs]
 
-        record += [self.env.get_immeditate_rewards_avaialable()]
+        record += [self.env.get_immediate_rewards_available()]
 
         self.history.append(record)
 

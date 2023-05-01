@@ -19,6 +19,8 @@ class TestMetric(Enum):
     ENERGY_ERROR = 3
     MAX_CUT = 4
     FINAL_CUT = 5
+    BEST_COVER = 6
+    FINAL_COVER = 7
 
 def set_global_seed(seed, env):
     torch.manual_seed(seed)

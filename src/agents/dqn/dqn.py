@@ -351,6 +351,8 @@ class DQN:
                     best_network = all([test_score > score for t,score in test_scores])
                 elif self.test_metric in [TestMetric.ENERGY_ERROR, TestMetric.BEST_ENERGY]:
                     best_network = all([test_score < score for t, score in test_scores])
+                elif self.test_metric in [TestMetric.FINAL_COVER, TestMetric.BEST_COVER]:
+                    best_network = all([test_score > score for t, score in test_scores])
                 else:
                     raise NotImplementedError("{} is not a recognised TestMetric".format(self.test_metric))
 
@@ -560,6 +562,10 @@ class DQN:
                             batch_scores[i] = env.get_best_cut()
                         elif self.test_metric == TestMetric.FINAL_CUT:
                             batch_scores[i] = env.calculate_cut()
+                        elif self.test_metric == TestMetric.FINAL_COVER:
+                            batch_scores[i] = env.calculate_mvc()
+                        elif self.test_metric == TestMetric.BEST_COVER:
+                            batch_scores[i] = env.get_best_cover()
 
                         test_scores.append(batch_scores[i])
 
