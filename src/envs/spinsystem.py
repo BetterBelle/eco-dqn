@@ -195,8 +195,13 @@ class SpinSystemBase(ABC):
             # We've generated an empty graph, this is pointless, try again.
             self.reset()
         else:
-            ## Maximum local reward is just the biggest of the local rewards from the initial state of all 1s
-            self.max_local_reward_available = np.max(local_rewards_available)
+            #TODO: PUT THIS INTO NEW FUNCTION COMPUTATION STUFF
+            # This factor is used to normalize the solution quality
+            if self.optimisation_target == OptimisationTarget.MIN_COVER:
+                self.max_local_reward_available = self.n_spins
+            else:
+                ## Maximum local reward is just the biggest of the local rewards from the initial state of all 1s
+                self.max_local_reward_available = np.max(local_rewards_available)
 
         ### Reset the state rewards and greedy actions available, definitely a better name for this function
         self.state = self._reset_state(spins)
@@ -258,9 +263,6 @@ class SpinSystemBase(ABC):
 
         Because of matrix multiplication being useful for computing max cut here, they format the spins to floats for parallelisation. 
         """
-        # Array of all zeros observation_space shape x n_actions size
-        # Observation space is 7, actions being number of nodes.
-        # State is therefore a 7xN array? Update when known
         state = np.zeros((self.observation_space.shape[1], self.n_actions))
 
         if spins is None:
@@ -306,53 +308,53 @@ class SpinSystemBase(ABC):
         return spins
 
     ### NOTE: NOT CALLED ANYWHERE?
-    # def calculate_best_energy(self):
-    #     if self.n_spins <= 10:
-    #         # Generally, for small systems the time taken to start multiple processes is not worth it.
-    #         res = self.calculate_best_brute()
+    def calculate_best_energy(self):
+        if self.n_spins <= 10:
+            # Generally, for small systems the time taken to start multiple processes is not worth it.
+            res = self.calculate_best_brute()
 
-    #     else:
-    #         # Start up processing pool
-    #         n_cpu = int(mp.cpu_count()) / 2
+        else:
+            # Start up processing pool
+            n_cpu = int(mp.cpu_count()) / 2
 
-    #         pool = mp.Pool(mp.cpu_count())
+            pool = mp.Pool(mp.cpu_count())
 
-    #         # Split up state trials across the number of cpus
-    #         iMax = 2 ** (self.n_spins)
-    #         args = np.round(np.linspace(0, np.ceil(iMax / n_cpu) * n_cpu, n_cpu + 1))
-    #         arg_pairs = [list(args) for args in zip(args, args[1:])]
+            # Split up state trials across the number of cpus
+            iMax = 2 ** (self.n_spins)
+            args = np.round(np.linspace(0, np.ceil(iMax / n_cpu) * n_cpu, n_cpu + 1))
+            arg_pairs = [list(args) for args in zip(args, args[1:])]
 
-    #         # Try all the states.
-    #         #             res = pool.starmap(self._calc_over_range, arg_pairs)
-    #         try:
-    #             res = pool.starmap(self._calc_over_range, arg_pairs)
-    #             # Return the best solution,
-    #             idx_best = np.argmin([e for e, s in res])
-    #             res = res[idx_best]
-    #         except Exception as e:
-    #             # Falling back to single-thread implementation.
-    #             # res = self.calculate_best_brute()
-    #             res = self._calc_over_range(0, 2 ** (self.n_spins))
-    #         finally:
-    #             # No matter what happens, make sure we tidy up after outselves.
-    #             pool.close()
+            # Try all the states.
+            #             res = pool.starmap(self._calc_over_range, arg_pairs)
+            try:
+                res = pool.starmap(self._calc_over_range, arg_pairs)
+                # Return the best solution,
+                idx_best = np.argmin([e for e, s in res])
+                res = res[idx_best]
+            except Exception as e:
+                # Falling back to single-thread implementation.
+                # res = self.calculate_best_brute()
+                res = self._calc_over_range(0, 2 ** (self.n_spins))
+            finally:
+                # No matter what happens, make sure we tidy up after outselves.
+                pool.close()
 
-    #         if self.spin_basis == SpinBasis.BINARY:
-    #             # convert {1,-1} --> {0,1}
-    #             best_score, best_spins = res
-    #             best_spins = (1 - best_spins) / 2
-    #             res = best_score, best_spins
+            if self.spin_basis == SpinBasis.BINARY:
+                # convert {1,-1} --> {0,1}
+                best_score, best_spins = res
+                best_spins = (1 - best_spins) / 2
+                res = best_score, best_spins
 
-    #         if self.optimisation_target == OptimisationTarget.CUT:
-    #             best_energy, best_spins = res
-    #             best_cut = self.calculate_cut(best_spins)
-    #             res = best_cut, best_spins
-    #         elif self.optimisation_target == OptimisationTarget.ENERGY:
-    #             pass
-    #         else:
-    #             raise NotImplementedError()
+            if self.optimisation_target == OptimisationTarget.CUT:
+                best_energy, best_spins = res
+                best_cut = self.calculate_cut(best_spins)
+                res = best_cut, best_spins
+            elif self.optimisation_target == OptimisationTarget.ENERGY:
+                pass
+            else:
+                raise NotImplementedError()
 
-    #     return res
+        return res
 
     def seed(self, seed):
         return self.seed
@@ -479,7 +481,7 @@ class SpinSystemBase(ABC):
                     self.state[idx, action] = 0
 
             elif observable==Observable.IMMEDIATE_VALIDITY_DIFFERENCE:
-                pass
+                self.state[idx, :] = self.get_newly_uncovered_edges(self.state[0, :self.n_spins], self.matrix)
 
             ### Global observables ###
             elif observable==Observable.EPISODE_TIME:
@@ -499,10 +501,11 @@ class SpinSystemBase(ABC):
                 self.state[idx, :self.n_spins] = np.count_nonzero(self.best_obs_spins[:self.n_spins] - self.state[0, :self.n_spins])
 
             elif observable==Observable.GLOBAL_VALIDITY_DIFFERENCE:
-                pass
+                self.state[idx, :] = self.get_edges_uncovered(self.state[0, :self.n_spins], self.matrix) - self.get_edges_uncovered(self.best_obs_spins, self.matrix)
 
             elif observable==Observable.VALIDITY_BIT:
-                pass
+                # if number of edges uncovered is 0, then valid (True)
+                self.state[idx, :] = self.get_edges_uncovered(self.state[0, :self.n_spins], self.matrix) == 0
 
 
         #############################################################################################
@@ -549,10 +552,10 @@ class SpinSystemBase(ABC):
             immediate_reward_function = lambda *args: -1*self._get_immeditate_energies_avaialable_jit(*args)
         elif self.optimisation_target==OptimisationTarget.CUT:
             immediate_reward_function = self._get_immeditate_cuts_avaialable_jit
-        elif self.optimisation_target == OptimisationTarget.MVC:
-            immediate_reward_function = self._get_immediate_vertex_covers_available
+        elif self.optimisation_target == OptimisationTarget.MIN_COVER:
+            immediate_reward_function = SpinSystemUnbiased._get_immediate_vertex_covers_available
         else:
-            raise NotImplementedError("Optimisation target {} not recognised.".format(self.optimisation_ta))
+            raise NotImplementedError("Optimisation target {} not recognised.".format(self.optimisation_target))
 
         spins = spins.astype('float64')
         matrix = self.matrix.astype('float64')
@@ -590,7 +593,7 @@ class SpinSystemBase(ABC):
             score = self.calculate_cut(spins)
         elif self.optimisation_target==OptimisationTarget.ENERGY:
             score = -1.*self.calculate_energy(spins)
-        elif self.optimisation_target==OptimisationTarget.MVC:
+        elif self.optimisation_target==OptimisationTarget.MIN_COVER:
             score = self.calculate_mvc(spins)
         else:
             raise NotImplementedError
@@ -601,8 +604,8 @@ class SpinSystemBase(ABC):
             delta_score = self._calculate_cut_change(new_spins, matrix, action)
         elif self.optimisation_target == OptimisationTarget.ENERGY:
             delta_score = -1. * self._calculate_energy_change(new_spins, matrix, action)
-        elif self.optimisation_target == OptimisationTarget.MVC:
-            delta_score = self._calculate_mvc_change(new_spins, matrix, action)
+        elif self.optimisation_target == OptimisationTarget.MIN_COVER:
+            delta_score = self._calculate_mvc_score_change(new_spins, matrix, action)
         else:
             raise NotImplementedError
         return delta_score
@@ -617,6 +620,12 @@ class SpinSystemBase(ABC):
             if not np.isin(spins, [-1, 1]).all():
                 raise Exception("SpinSystem is configured for signed spins ([-1,1]).")
         return spins
+    
+    def get_edges_uncovered(self, spins, matrix):
+        """
+        Number of edges not covered by spins
+        """
+        return np.sum((matrix != 0) * (spins == -1) * np.array([spins == -1], dtype=np.float64).T) / 2
 
     @abstractmethod
     def calculate_energy(self, spins=None):
@@ -647,7 +656,11 @@ class SpinSystemBase(ABC):
         raise NotImplementedError
     
     @abstractmethod
-    def _calculate_mvc_change(self, new_spins, matrix, action):
+    def _calculate_mvc_score_change(self, new_spins, matrix, action):
+        raise NotImplementedError
+    
+    @abstractmethod
+    def get_newly_uncovered_edges(self, spins, matrix):
         raise NotImplementedError
 
 ##########
@@ -683,6 +696,10 @@ class SpinSystemUnbiased(SpinSystemBase):
         else:
             raise NotImplementedError("Can't return best cut when optimisation target is set to energy.")
         
+    def get_best_cover(self):
+        if self.optimisation_target == OptimisationTarget.MIN_COVER:
+            return np.sum(self.best_spins == 1)
+        
     def calculate_mvc(self, spins = None):
         """
         Calculate the size of the current cover regardless of validity. 
@@ -690,8 +707,7 @@ class SpinSystemUnbiased(SpinSystemBase):
         if spins is None:
             spins = self._get_spins()
         
-        ### TODO: There's probably an extra check I need to make here to check if the spins are -1 and 1 or 0 and 1
-        return np.count_nonzero(spins)
+        return np.sum(spins == 1)
 
     def _calc_over_range(self, i0, iMax):
         list_spins = [2 * np.array([int(x) for x in list_string]) - 1
@@ -712,9 +728,15 @@ class SpinSystemUnbiased(SpinSystemBase):
         return -1 * new_spins[action] * matmul(new_spins.T, matrix[:, action])
     
     @staticmethod
-    def _calculate_mvc_change(new_spins, matrix, action):
-        ### Not sure what this gives yet, will have to verify with debugger
-        return None
+    def _calculate_mvc_score_change(new_spins, matrix, action):
+        """
+        Given array of new_spins and adjacency matrix, find the score change given the spin "action" was changed
+        This is just the -1 * immediate_vertex_covers_available(old_spins), where old spins is just flipping the action
+        """
+        old_spins = new_spins
+        old_spins[action] *= -1
+
+        return -1 * SpinSystemUnbiased._get_immediate_vertex_covers_available(old_spins, matrix)[action]
 
     @staticmethod
     @jit(float64(float64[:],float64[:,:]), nopython=True)
@@ -748,8 +770,62 @@ class SpinSystemUnbiased(SpinSystemBase):
     
     @staticmethod
     def _get_immediate_vertex_covers_available(spins, matrix):
-        ### Get the immediately available vertex covers that are valid
-        return spins
+        """
+        ### Explanation: matrix multiplication of adj and spins (vertices) gives number of edges incident on that node
+        ### spins == -1 gives vertices that are not in the solution as boolean mask
+        ### Multiplying by matrix gets rid of all edges covered by nodes in solution (0s) without double counting, column wise
+        ### That result is essentially a graph removing the edges covered by the solution (but only counting once)
+        ### This new matrix multiplied by spins therefore gives the number of edges not covered by another vertex in the solution incident on
+            each vertex
+        ### Multiplying this by the state of spins (1s in solution and -1s not in solution) gives the change in number of edges covered on flip
+        ### Sum of an adjacency matrix divided by two is the number of edges in that matrix
+        ### We want the number of edges that aren't covered by our solution (because our list counts only those edges anyway)
+        ### We can do this by multiplying by the bool mask of spins in solution and it's transpose
+        ### If we then take that value and subtract from it the change in covered edges for every vertex, we get a value that represents 
+        ### the number of vertices not covered by the solution on each vertex flip
+        ### Any value that is a 0 means by flipping that vertex you get a valid cover
+        ### We want the immediate reward to be the size of the cover on flip, but have it be -1 when invalid
+
+        # We want: If an invalid solution is created, the reward for that flip should be the difference in degree of invalidity
+        # If a valid solution is created, it should be the difference in size of the set
+        """
+        newly_covered_on_flip = SpinSystemUnbiased.get_newly_uncovered_edges(spins, matrix)
+        uncovered_edges = np.sum((matrix != 0) * (spins == -1) * np.array([spins == -1], dtype=np.float64).T) / 2
+        total_uncovered_on_flip = uncovered_edges - newly_covered_on_flip
+        solution_set_size = sum(spins == 1)
+
+
+        # First get a boolean mask for validity
+        # To verify this, check if the number of uncovered edges minus the number of edges covered on flip (it's negative if it loses edges) is 0
+        validity_mask = total_uncovered_on_flip == 0
+
+        # Subtracting spins from solution set size gives you the new set size on flip
+        # We then take the total number of nodes and subtract from that the new set size to give you the size of the set not in the solution,
+        # this ensures that larger solution sets give smaller rewards (i.e. a set size of 3 with 5 nodes vs a set size of 2 with 5 nodes will now
+        # give rewards of 2 and 3 (higher reward for smaller set) instead of 3 and 2)
+        # Next, we multiply by the validity mask to keep only the valid solutions
+        new_set_size_score = validity_mask * (len(spins) - (solution_set_size - spins))
+        
+        # Next we want the new number of uncovered edges on flip (i.e. the new degree of invalidity) for each flip
+        # This is simply the uncovered edges - newly covered on flip
+        new_uncovered_edges =  uncovered_edges - newly_covered_on_flip
+
+        # Score is defined as the set score - new_uncovered edges
+        score_on_flip = new_set_size_score - new_uncovered_edges
+
+        # Now, these rewards are relative to the current state, so calculate the score for the current state
+        current_validity = (uncovered_edges == 0)
+        current_score = current_validity * (len(spins) - solution_set_size) - uncovered_edges
+
+        # Therefore immediate rewards are going to be the difference between the current score and the different scores on each flip
+        immediate_rewards_available = score_on_flip - current_score
+
+        return immediate_rewards_available
+    
+    @staticmethod
+    @jit(nopython=True)
+    def get_newly_uncovered_edges(spins, matrix):
+        return spins * matmul(matrix * (spins == -1), spins)
 
 class SpinSystemBiased(SpinSystemBase):
 
