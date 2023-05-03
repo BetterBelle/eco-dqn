@@ -14,7 +14,7 @@ from src.agents.dqn.utils import TestMetric
 from src.envs.utils import (SetGraphGenerator,
                             RandomErdosRenyiGraphGenerator,
                             EdgeType, RewardSignal, ExtraAction,
-                            OptimisationTarget, SpinBasis, 
+                            OptimisationTarget, SpinBasis,
                             MVC_OBSERVABLES)
 from src.networks.mpnn import MPNN
 
@@ -26,7 +26,7 @@ except ImportError:
 
 import time
 
-def run(save_loc="ER_20spin/eco"):
+def run(save_loc="ER_100spin/eco"):
 
     print("\n----- Running {} -----\n".format(os.path.basename(__file__)))
 
@@ -46,22 +46,21 @@ def run(save_loc="ER_20spin/eco"):
                 'memory_length':None,
                 'horizon_length':None,
                 'stag_punishment':None,
-                'basin_reward':1./20,
+                'basin_reward':1./100,
                 'reversible_spins':True}
 
     ####################################################
     # SET UP TRAINING AND TEST GRAPHS
     ####################################################
 
-    n_spins_train = 20
+    n_spins_train = 100
 
-    ## Uniform edges for MVC
     train_graph_generator = RandomErdosRenyiGraphGenerator(n_spins=n_spins_train,p_connection=0.15,edge_type=EdgeType.UNIFORM)
 
     ####
     # Pre-generated test graphs
     ####
-    graph_save_loc = "_graphs/testing/ER_20spin_p15_50graphs.pkl"
+    graph_save_loc = "_graphs/testing/ER_100spin_p15_50graphs.pkl"
     graphs_test = load_graph_set(graph_save_loc)
     n_tests = len(graphs_test)
 
@@ -101,7 +100,7 @@ def run(save_loc="ER_20spin/eco"):
     # SET UP AGENT
     ####################################################
 
-    nb_steps = 2500000
+    nb_steps = 8000000
 
     network_fn = lambda: MPNN(n_obs_in=train_envs[0].observation_space.shape[1],
                               n_layers=3,
@@ -119,10 +118,10 @@ def run(save_loc="ER_20spin/eco"):
                 double_dqn=True,
                 clip_Q_targets=False,
 
-                replay_start_size=500,
-                replay_buffer_size=5000,  # 20000
+                replay_start_size=1500,
+                replay_buffer_size=10000,  # 20000
                 gamma=gamma,  # 1
-                update_target_frequency=1000,  # 500
+                update_target_frequency=2500,  # 500
 
                 update_learning_rate=False,
                 initial_learning_rate=1e-4,
@@ -139,19 +138,19 @@ def run(save_loc="ER_20spin/eco"):
                 update_exploration=True,
                 initial_exploration_rate=1,
                 final_exploration_rate=0.05,  # 0.05
-                final_exploration_step=150000,  # 40000
+                final_exploration_step=800000,  # 40000
 
                 adam_epsilon=1e-8,
                 logging=False,
                 loss="mse",
 
-                save_network_frequency=100000,
+                save_network_frequency=400000,
                 network_save_path=network_save_path,
 
                 evaluate=True,
                 test_envs=test_envs,
                 test_episodes=n_tests,
-                test_frequency=10000,  # 10000
+                test_frequency=50000,  # 10000
                 test_save_path=test_save_path,
                 test_metric=TestMetric.BEST_COVER,
 
@@ -168,6 +167,7 @@ def run(save_loc="ER_20spin/eco"):
     print(time.time() - start)
 
     agent.save()
+
 
     ############
     # PLOT - learning curve

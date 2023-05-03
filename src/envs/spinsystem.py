@@ -698,7 +698,7 @@ class SpinSystemUnbiased(SpinSystemBase):
         
     def get_best_cover(self):
         if self.optimisation_target == OptimisationTarget.MIN_COVER:
-            return np.sum(self.best_spins == 1)
+            return self.best_score
         
     def calculate_mvc(self, spins = None):
         """
@@ -790,7 +790,7 @@ class SpinSystemUnbiased(SpinSystemBase):
         # If a valid solution is created, it should be the difference in size of the set
         """
         newly_covered_on_flip = SpinSystemUnbiased.get_newly_uncovered_edges(spins, matrix)
-        uncovered_edges = np.sum((matrix != 0) * (spins == -1) * np.array([spins == -1], dtype=np.float64).T) / 2
+        uncovered_edges = np.sum((matrix) * (spins == -1) * np.array([spins == -1], dtype=np.float64).T) / 2
         total_uncovered_on_flip = uncovered_edges - newly_covered_on_flip
         solution_set_size = sum(spins == 1)
 

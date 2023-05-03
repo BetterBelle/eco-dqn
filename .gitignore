@@ -17,7 +17,3 @@ log_data.pkl
 # Ignore network weights and pickles
 *.pth
 *.pkl
-
-# Ignore result images and pdfs
-loss.*
-training_curve.*

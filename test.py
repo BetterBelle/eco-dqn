@@ -52,7 +52,7 @@ def calculate_mvc_rewards_available(matrix, spins):
     # Therefore immediate rewards are going to be the difference between the current score and the different scores on each flip
     immediate_rewards_available = score_on_flip - current_score
 
-    return newly_covered_on_flip
+    return immediate_rewards_available
 
 
 def _calculate_mvc_score_change(new_spins, matrix, action):
