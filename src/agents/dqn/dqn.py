@@ -13,6 +13,7 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
+from src.envs.spinsystem import SpinSystemBase
 from src.agents.dqn.utils import ReplayBuffer, Logger, TestMetric, set_global_seed
 from src.envs.utils import ExtraAction
 
@@ -78,7 +79,7 @@ class DQN:
     """
     def __init__(
         self,
-        envs,
+        envs : list[SpinSystemBase],
         network,
 
         # Initial network parameters.
@@ -237,7 +238,7 @@ class DQN:
         self.save_network_frequency = save_network_frequency
         self.network_save_path = network_save_path
 
-    def get_random_env(self, envs=None):
+    def get_random_env(self, envs=None) -> tuple[SpinSystemBase, bool]:
         if envs is None:
             env = random.sample(self.envs, k=1)[0]
         else:
@@ -347,14 +348,15 @@ class DQN:
                 test_score = self.evaluate_agent()
                 print('\nTest score: {}\n'.format(np.round(test_score,3)))
 
-                if self.test_metric in [TestMetric.FINAL_CUT,TestMetric.MAX_CUT,TestMetric.CUMULATIVE_REWARD]:
-                    best_network = all([test_score > score for t,score in test_scores])
-                elif self.test_metric in [TestMetric.ENERGY_ERROR, TestMetric.BEST_ENERGY]:
-                    best_network = all([test_score < score for t, score in test_scores])
-                elif self.test_metric in [TestMetric.FINAL_COVER, TestMetric.BEST_COVER]:
-                    best_network = all([test_score > score for t, score in test_scores])
-                else:
-                    raise NotImplementedError("{} is not a recognised TestMetric".format(self.test_metric))
+                best_network = all([test_score > score for t, score in test_scores])
+                # if self.test_metric in [TestMetric.FINAL_CUT,TestMetric.MAX_CUT,TestMetric.CUMULATIVE_REWARD]:
+                #     best_network = all([test_score > score for t,score in test_scores])
+                # elif self.test_metric in [TestMetric.ENERGY_ERROR, TestMetric.BEST_ENERGY]:
+                #     best_network = all([test_score < score for t, score in test_scores])
+                # elif self.test_metric in [TestMetric.FINAL_COVER, TestMetric.BEST_COVER]:
+                #     best_network = all([test_score > score for t, score in test_scores])
+                # else:
+                #     raise NotImplementedError("{} is not a recognised TestMetric".format(self.test_metric))
 
                 if best_network:
                     path = self.network_save_path
@@ -554,14 +556,15 @@ class DQN:
                         batch_scores[i] += rew
 
                     if done:
+                        ### CONSIDER CHANGING
                         if self.test_metric == TestMetric.BEST_ENERGY:
                             batch_scores[i] = env.best_energy
                         elif self.test_metric == TestMetric.ENERGY_ERROR:
                             batch_scores[i] = abs(env.best_energy - env.calculate_best()[0])
-                        elif self.test_metric == TestMetric.MAX_CUT:
+                        elif self.test_metric == TestMetric.MAX_CUT or self.test_metric == TestMetric.MIN_CUT:
                             batch_scores[i] = env.get_best_cut()
                         elif self.test_metric == TestMetric.FINAL_CUT:
-                            batch_scores[i] = env.calculate_cut()
+                            batch_scores[i] = env.scorer.get_score(self.env.state[0, :self.env.n_spins], self.env.matrix)
                         elif self.test_metric == TestMetric.FINAL_COVER:
                             batch_scores[i] = env.calculate_mvc()
                         elif self.test_metric == TestMetric.BEST_COVER:

@@ -29,6 +29,7 @@ class OptimisationTarget(Enum):
     CUT = 1
     ENERGY = 2
     MIN_COVER = 3
+    MIN_CUT = 4
 
 class SpinBasis(Enum):
 
@@ -38,7 +39,7 @@ class SpinBasis(Enum):
 class Observable(Enum):
     # Local observations that differ between nodes.
     SPIN_STATE = 1 # The state of vertices
-    IMMEDIATE_REWARD_AVAILABLE = 2 # The immediate reward if the current vertex is changed
+    IMMEDIATE_QUALITY_CHANGE = 2 # The immediate quality change on vertex flip
     TIME_SINCE_FLIP = 3 # The number of steps since the vertex was changed
 
     # Global observations that are the same for all nodes.
@@ -54,7 +55,7 @@ class Observable(Enum):
     VALIDITY_BIT = 11 # Whether the current state is a valid one
 
 DEFAULT_OBSERVABLES = [Observable.SPIN_STATE,
-                       Observable.IMMEDIATE_REWARD_AVAILABLE,
+                       Observable.IMMEDIATE_QUALITY_CHANGE,
                        Observable.TIME_SINCE_FLIP,
                        Observable.DISTANCE_FROM_BEST_SCORE,
                        Observable.DISTANCE_FROM_BEST_STATE,

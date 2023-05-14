@@ -21,6 +21,7 @@ class TestMetric(Enum):
     FINAL_CUT = 5
     BEST_COVER = 6
     FINAL_COVER = 7
+    MIN_CUT = 8
 
 def set_global_seed(seed, env):
     torch.manual_seed(seed)

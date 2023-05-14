@@ -26,7 +26,7 @@ except ImportError:
 
 import time
 
-def run(save_loc="ER_20spin/eco/max_cut"):
+def run(save_loc="ER_20spin/eco/min_cut"):
 
     print("\n----- Running {} -----\n".format(os.path.basename(__file__)))
 
@@ -40,7 +40,7 @@ def run(save_loc="ER_20spin/eco/max_cut"):
     env_args = {'observables':DEFAULT_OBSERVABLES,
                 'reward_signal':RewardSignal.BLS,
                 'extra_action':ExtraAction.NONE,
-                'optimisation_target':OptimisationTarget.CUT,
+                'optimisation_target':OptimisationTarget.MIN_CUT,
                 'spin_basis':SpinBasis.BINARY,
                 'norm_rewards':True,
                 'memory_length':None,
@@ -152,7 +152,7 @@ def run(save_loc="ER_20spin/eco/max_cut"):
                 test_episodes=n_tests,
                 test_frequency=10000,  # 10000
                 test_save_path=test_save_path,
-                test_metric=TestMetric.MAX_CUT,
+                test_metric=TestMetric.MIN_CUT,
 
                 seed=None
                 )
@@ -189,6 +189,8 @@ def run(save_loc="ER_20spin/eco/max_cut"):
       plt.ylabel("Max Cut")
     elif agent.test_metric==TestMetric.FINAL_CUT:
       plt.ylabel("Final Cut")
+    elif agent.test_metric==TestMetric.MIN_CUT:
+      plt.ylabel("Minimum Cut")
 
     plt.savefig(fig_fname + ".png", bbox_inches='tight')
     plt.savefig(fig_fname + ".pdf", bbox_inches='tight')
