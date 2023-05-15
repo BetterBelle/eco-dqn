@@ -41,7 +41,7 @@ def run(save_loc="ER_20spin/eco/min_cut"):
                 'reward_signal':RewardSignal.BLS,
                 'extra_action':ExtraAction.NONE,
                 'optimisation_target':OptimisationTarget.MIN_CUT,
-                'spin_basis':SpinBasis.BINARY,
+                'spin_basis':SpinBasis.SIGNED,
                 'norm_rewards':True,
                 'memory_length':None,
                 'horizon_length':None,
@@ -95,6 +95,7 @@ def run(save_loc="ER_20spin/eco/min_cut"):
     network_save_path = os.path.join(network_folder,'network.pth')
     test_save_path = os.path.join(network_folder,'test_scores.pkl')
     loss_save_path = os.path.join(network_folder, 'losses.pkl')
+    solutions_save_path = os.path.join(network_folder, 'solution.pkl')
 
     ####################################################
     # SET UP AGENT
@@ -152,7 +153,7 @@ def run(save_loc="ER_20spin/eco/min_cut"):
                 test_episodes=n_tests,
                 test_frequency=10000,  # 10000
                 test_save_path=test_save_path,
-                test_metric=TestMetric.MIN_CUT,
+                test_metric=TestMetric.BEST,
 
                 seed=None
                 )
@@ -169,28 +170,43 @@ def run(save_loc="ER_20spin/eco/min_cut"):
     agent.save()
 
     ############
-    # PLOT - learning curve
+    # PLOT - solution curve
     ############
-    data = pickle.load(open(test_save_path,'rb'))
+    data = pickle.load(open(solutions_save_path,'rb'))
     data = np.array(data)
 
     fig_fname = os.path.join(network_folder,"training_curve")
 
     plt.plot(data[:,0],data[:,1])
     plt.xlabel("Timestep")
-    plt.ylabel("Mean reward")
+    plt.ylabel("Mean Solution Quality")
     if agent.test_metric==TestMetric.ENERGY_ERROR:
       plt.ylabel("Energy Error")
-    elif agent.test_metric==TestMetric.BEST_ENERGY:
-      plt.ylabel("Best Energy")
     elif agent.test_metric==TestMetric.CUMULATIVE_REWARD:
       plt.ylabel("Cumulative Reward")
-    elif agent.test_metric==TestMetric.MAX_CUT:
-      plt.ylabel("Max Cut")
-    elif agent.test_metric==TestMetric.FINAL_CUT:
-      plt.ylabel("Final Cut")
-    elif agent.test_metric==TestMetric.MIN_CUT:
-      plt.ylabel("Minimum Cut")
+
+    plt.savefig(fig_fname + ".png", bbox_inches='tight')
+    plt.savefig(fig_fname + ".pdf", bbox_inches='tight')
+
+    plt.clf()
+
+    ############
+    # PLOT - score curve
+    ############
+    data = pickle.load(open(test_save_path,'rb'))
+    data = np.array(data)
+
+    fig_fname = os.path.join(network_folder,"score_curve")
+
+    plt.plot(data[:,0],data[:,1])
+    plt.xlabel("Timestep")
+    plt.ylabel("Mean score")
+    if agent.test_metric == TestMetric.FINAL:
+       plt.ylabel("Mean final score")
+    if agent.test_metric==TestMetric.ENERGY_ERROR:
+      plt.ylabel("Energy Error")
+    elif agent.test_metric==TestMetric.CUMULATIVE_REWARD:
+      plt.ylabel("Cumulative Reward")
 
     plt.savefig(fig_fname + ".png", bbox_inches='tight')
     plt.savefig(fig_fname + ".pdf", bbox_inches='tight')

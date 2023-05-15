@@ -20,7 +20,7 @@ try:
 except ImportError:
     pass
 
-def run(save_loc="ER_20spin/eco",
+def run(save_loc="ER_20spin/eco/max_cut",
         graph_save_loc="_graphs/validation/ER_20spin_p15_100graphs.pkl",
         batched=True,
         max_batch_size=None):
