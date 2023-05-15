@@ -162,11 +162,7 @@ class SpinSystemBase(ABC):
 
         self.reset()
 
-        # self.score = self.calculate_score()
         self.score = self.scorer.get_score(self.state[0, :self.n_spins], self.matrix)
-        # if self.score != self.scorer.get_score(self.state[0, :self.n_spins], self.matrix):
-        #     raise ValueError("Score calculation is incorrect! actual: " + str(self.score) 
-        #                      + "\ncalculated: " + self.scorer.get_score(self.state[0, :self.n_spins], self.matrix))
 
         if self.reward_signal == RewardSignal.SINGLE:
             self.init_score = self.score
@@ -193,14 +189,9 @@ class SpinSystemBase(ABC):
 
         # Generates an array of 1s of size number of spins
         empty_solution = np.array([-1] * self.n_spins, dtype=np.float64)
-        # spinsOne = np.array([1] * self.n_spins)
 
         # Gets the array saying how much reward you get from flipping each vertex (i.e. the solution improvement)
         local_rewards_available = self.scorer.get_score_mask(empty_solution, self.matrix)
-        # local_rewards_available = self.get_immediate_rewards_available(spinsOne)
-        # if not (local_rewards_available == self.scorer.get_score_mask(empty_solution, self.matrix)).all():
-        #     raise ValueError("Local rewards incorrectly calculated. actual: " + str(local_rewards_available)
-        #                      + "\ncalculated: " + str(self.scorer.get_score_mask(empty_solution, self.matrix)))
 
         # Removes all zero values from that list
         local_rewards_available = local_rewards_available[np.nonzero(local_rewards_available)]
@@ -210,19 +201,11 @@ class SpinSystemBase(ABC):
             # We've generated an empty graph, this is pointless, try again.
             self.reset()
         else:
-            # self.max_local_reward_available = np.max(local_rewards_available)
             self.scorer.set_max_local_reward(empty_solution, self.matrix)
-            # if self.max_local_reward_available != self.scorer._max_local_reward:
-            #     raise ValueError("Max local reward incorrectly calculated. actual:" + str(self.max_local_reward_available)
-            #                      + "\ncalculated: " + str(self.scorer._max_local_reward))
 
         ### Reset the state rewards and greedy actions available, definitely a better name for this function
         self.state = self._reset_state(spins)
-        # self.score = self.calculate_score()
         self.score = self.scorer.get_score(self.state[0, :self.n_spins], self.matrix)
-        # if self.score != self.scorer.get_score(self.state[0, :self.n_spins], self.matrix):
-        #     raise ValueError("Score incorrectly calculated. actual:" + str(self.score)
-        #                          + "\ncalculated: " + str(self.scorer.get_score(self.state[0, :self.n_spins], self.matrix)))
 
         if self.reward_signal == RewardSignal.SINGLE:
             self.init_score = self.score
@@ -230,6 +213,11 @@ class SpinSystemBase(ABC):
         ### When resetting, the best score and best observed are just the current score
         self.best_score = self.score
         self.best_obs_score = self.score
+
+        ### TODO: SET THE NORMALIZED SCORE AS WELL SO WE DON'T HAVE TO RECOMPUTE IT
+
+        ### Best solution is the actual solution of the current state, not the score
+        self.best_solution = self.scorer.get_solution(self.state[0, :self.n_spins], self.matrix)
 
         ### Best spins is of course state[0, :self.n_spins] because that holds all the spin booleans similar to score
         self.best_spins = self.state[0, :self.n_spins].copy()
@@ -299,19 +287,11 @@ class SpinSystemBase(ABC):
         for idx, obs in self.observables:
             if obs==Observable.IMMEDIATE_QUALITY_CHANGE:
                 ### Normalize the immediately available rewards by the maximum reward to get values between 1 and 0
-                # state[idx, :self.n_spins] = self.get_immediate_rewards_available(spins=state[0, :self.n_spins]) / self.max_local_reward_available
                 state[idx, :self.n_spins] = self.scorer.get_solution_quality_mask(state[0, :self.n_spins], self.matrix) / self.scorer._max_local_reward
-                # if not (state[idx, :self.n_spins] == self.scorer.get_solution_quality_mask(state[0, :self.n_spins], self.matrix) / self.scorer._max_local_reward).all():
-                #     raise ValueError("Immediate quality change incorrectly calculated.\nactual:" + str(state[idx, :self.n_spins])
-                #                  + "\ncalculated: " + str(self.scorer.get_solution_quality_mask(state[0, :self.n_spins], self.matrix) / self.scorer._max_local_reward))
-            
-            elif obs==Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE:
-                # immediate_rewards_available = self.get_immediate_rewards_available(spins=state[0, :self.n_spins])
-                immediate_rewards_available = self.scorer.get_score_mask(state[0, :self.n_spins], self.matrix)
-                # if not (immediate_rewards_available == self.scorer.get_score_mask(state[0, :self.n_spins], self.matrix)).all():
-                #     raise ValueError("Number of greedy actions incorrectly calculated.\nactual:" + str(immediate_rewards_available)
-                #                  + "\ncalculated: " + str(self.scorer.get_score_mask(state[0, :self.n_spins], self.matrix)))
 
+            elif obs==Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE:
+                immediate_rewards_available = self.scorer.get_score_mask(state[0, :self.n_spins], self.matrix)
+                
                 ### Every value number of greedy actions available is count of every immediate reward normalized by num vertices
                 ### NOTE: 1 - resulting value gives the inverse of rewards <= 0, so the positive rewards
                 state[idx, :self.n_spins] = 1 - np.sum(immediate_rewards_available <= 0) / self.n_spins
@@ -415,29 +395,14 @@ class SpinSystemBase(ABC):
                 randomised_spins = True
                 random_actions = np.random.choice([1, -1], self.n_spins)
                 new_state[0, :] = self.state[0, :] * random_actions
-                # new_score = self.calculate_score(new_state[0, :])
                 new_score = self.scorer.get_score(new_state[0, :self.n_spins], self.matrix)
-                # if new_score != self.scorer.get_score(new_state[0, :self.n_spins], self.matrix):
-                #     raise ValueError("Score incorrectly calculated. actual:" + str(new_score)
-                #                  + "\ncalculated: " + str(self.scorer.get_score(new_state[0, :self.n_spins], self.matrix)))
                 delta_score = new_score - self.score
                 self.score = new_score
         else:
-            # Perform the action and calculate the score change.
-            # new_state[0,action] = -self.state[0,action]
-
-            # if self.gg.biased:
-            #     delta_score = self._calculate_score_change(new_state[0,:self.n_spins], self.matrix, self.bias, action)
-            # else:
-            #     delta_score = self._calculate_score_change(new_state[0,:self.n_spins], self.matrix, action)
-
             # Calculate score change, which is just the index of the action for the current spins
             delta_score = self.scorer.get_score_mask(self.state[0, :], self.matrix)[action]
             # Now change the state
             new_state[0,action] = -self.state[0,action]
-            # if delta_score != self.scorer.get_score_mask(self.state[0, :self.n_spins], self.matrix)[action]:
-            #     raise ValueError("Score change incorrectly calculated. actual:" + str(delta_score)
-            #                      + "\ncalculated: " + str(self.scorer.get_score_mask(self.state[0, :self.n_spins], self.matrix)[action]))
             self.score += delta_score
 
         #############################################################################################
@@ -452,13 +417,8 @@ class SpinSystemBase(ABC):
         #############################################################################################
 
         self.state = new_state
-        # immediate_rewards_available = self.get_immediate_rewards_available()
         immediate_quality_change = self.scorer.get_solution_quality_mask(self.state[0, :self.n_spins], self.matrix)
         immediate_score_changes = self.scorer.get_score_mask(self.state[0, :self.n_spins], self.matrix)
-
-        # if not (immediate_rewards_available == immediate_score_changes).all():
-        #     raise ValueError("Immediate score changes not computed correctly. actual:" + str(immediate_rewards_available)
-        #                      + "\ncalculated: " + str(immediate_score_changes))
 
         if self.score > self.best_obs_score:
             if self.reward_signal == RewardSignal.BLS:
@@ -481,10 +441,6 @@ class SpinSystemBase(ABC):
         #     rew = self.score - self.init_score
         ###
 
-        ### Ignoring this as we're dealing with normalization in a different way
-        # if self.norm_rewards:
-        #     rew /= self.n_spins
-
         if self.stag_punishment is not None or self.basin_reward is not None:
             visiting_new_state = self.history_buffer.update(action)
 
@@ -505,6 +461,7 @@ class SpinSystemBase(ABC):
             ### TODO: add the normalized version of the score in here as well, so we don't have to recompute it every time
             self.best_score = self.score
             self.best_spins = self.state[0, :self.n_spins].copy()
+            self.best_solution = self.scorer.get_solution(self.best_spins, self.matrix)
 
         if self.memory_length is not None:
             # For case of finite memory length.
@@ -529,11 +486,7 @@ class SpinSystemBase(ABC):
 
             ### Local observables ###
             if observable==Observable.IMMEDIATE_QUALITY_CHANGE:
-                # self.state[idx, :self.n_spins] = immediate_rewards_available / self.max_local_reward_available
                 self.state[idx, :self.n_spins] = immediate_quality_change / self.scorer._max_local_reward
-                # if not (self.state[idx, :self.n_spins] == immediate_quality_change / self.scorer._max_local_reward).all():
-                #     raise ValueError("Quality change incorrectly calculated. actual:" + str(self.state[idx, :self.n_spins])
-                #                  + "\ncalculated: " + str(immediate_quality_change / self.scorer._max_local_reward))
 
             elif observable==Observable.TIME_SINCE_FLIP:
                 self.state[idx, :] += (1. / self.max_steps)
@@ -554,18 +507,10 @@ class SpinSystemBase(ABC):
                 self.state[idx, :] = max(0, ((self.current_step - self.max_steps) / self.horizon_length) + 1)
 
             elif observable==Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE:
-                # self.state[idx, :] = 1 - np.sum(immediate_rewards_available <= 0) / self.n_spins
                 self.state[idx, :] = 1 - np.sum(immediate_score_changes <= 0) / self.n_spins
-                # if not (self.state[idx, :] == 1 - np.sum(immediate_score_changes <= 0) / self.n_spins).all():
-                #     raise ValueError("Quality change incorrectly calculated. actual:" + str(self.state[idx, :])
-                #                  + "\ncalculated: " + str(1 - np.sum(immediate_score_changes <= 0) / self.n_spins))
 
             elif observable==Observable.DISTANCE_FROM_BEST_SCORE:
-                # self.state[idx, :] = np.abs(self.score - self.best_obs_score) / self.max_local_reward_available
                 self.state[idx, :] = np.abs(self.score - self.best_obs_score) / self.scorer._max_local_reward
-                # if not (self.state[idx, :] == np.abs(self.score - self.best_obs_score) / self.scorer._max_local_reward).all():
-                #     raise ValueError("Distance from best score incorrectly calculated. actual:" + str(self.state[idx, :])
-                #                  + "\ncalculated: " + str(np.abs(self.score - self.best_obs_score) / self.scorer._max_local_reward))
 
             elif observable==Observable.DISTANCE_FROM_BEST_STATE:
                 self.state[idx, :] = np.count_nonzero(self.best_obs_spins[:self.n_spins] - self.state[0, :self.n_spins])
@@ -765,10 +710,6 @@ class SpinSystemUnbiased(SpinSystemBase):
             return self.best_score
         else:
             raise NotImplementedError("Can't return best cut when optimisation target is set to energy.")
-        
-    def get_best_cover(self):
-        if self.optimisation_target == OptimisationTarget.MIN_COVER:
-            return self.best_score
         
     def calculate_mvc(self, spins = None):
         """
