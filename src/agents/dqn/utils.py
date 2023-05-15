@@ -14,14 +14,10 @@ Transition = namedtuple(
 
 class TestMetric(Enum):
 
-    CUMULATIVE_REWARD = 1
-    BEST_ENERGY = 2
-    ENERGY_ERROR = 3
-    MAX_CUT = 4
-    FINAL_CUT = 5
-    BEST_COVER = 6
-    FINAL_COVER = 7
-    MIN_CUT = 8
+    FINAL = 1
+    BEST = 2
+    CUMULATIVE_REWARD = 3
+    ENERGY_ERROR = 4
 
 def set_global_seed(seed, env):
     torch.manual_seed(seed)

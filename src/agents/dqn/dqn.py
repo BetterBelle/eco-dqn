@@ -226,6 +226,7 @@ class DQN:
         self.test_metric = test_metric
 
         self.losses_save_path = os.path.join(os.path.split(self.test_save_path)[0], "losses.pkl")
+        self.solution_save_path = os.path.join(os.path.split(self.test_save_path)[0], "solution.pkl")
 
         if not self.acting_in_reversible_spin_env:
             for env in self.envs:
@@ -264,6 +265,7 @@ class DQN:
         t1 = time.time()
 
         test_scores = []
+        test_solutions = []
         losses = []
 
         is_training_ready = False
@@ -345,18 +347,10 @@ class DQN:
                     self.target_network.load_state_dict(self.network.state_dict())
 
             if (timestep+1) % self.test_frequency == 0 and self.evaluate and is_training_ready:
-                test_score = self.evaluate_agent()
-                print('\nTest score: {}\n'.format(np.round(test_score,3)))
+                test_score, test_solution = self.evaluate_agent()
+                print('\nTest score: {}\nTest solution: {}\n'.format(np.round(test_score,3), np.round(test_solution, 3)))
 
                 best_network = all([test_score > score for t, score in test_scores])
-                # if self.test_metric in [TestMetric.FINAL_CUT,TestMetric.MAX_CUT,TestMetric.CUMULATIVE_REWARD]:
-                #     best_network = all([test_score > score for t,score in test_scores])
-                # elif self.test_metric in [TestMetric.ENERGY_ERROR, TestMetric.BEST_ENERGY]:
-                #     best_network = all([test_score < score for t, score in test_scores])
-                # elif self.test_metric in [TestMetric.FINAL_COVER, TestMetric.BEST_COVER]:
-                #     best_network = all([test_score > score for t, score in test_scores])
-                # else:
-                #     raise NotImplementedError("{} is not a recognised TestMetric".format(self.test_metric))
 
                 if best_network:
                     path = self.network_save_path
@@ -367,6 +361,7 @@ class DQN:
                     self.save(path_main + path_ext)
 
                 test_scores.append([timestep+1,test_score])
+                test_solutions.append([timestep+1, test_solution])
 
             if (timestep + 1) % self.save_network_frequency == 0 and is_training_ready:
                 path = self.network_save_path
@@ -392,6 +387,11 @@ class DQN:
             pickle.dump(np.array(losses), output, pickle.HIGHEST_PROTOCOL)
             if verbose:
                 print('losses saved to {}'.format(self.losses_save_path))
+        
+        with open(self.solution_save_path, 'wb+') as output:
+            pickle.dump(np.array(test_solutions), output, pickle.HIGHEST_PROTOCOL)
+            if verbose:
+                print('solution saved to {}'.format(self.solution_save_path))
 
 
     @torch.no_grad()
@@ -523,7 +523,10 @@ class DQN:
         i_test = 0
         i_comp = 0
         test_scores = []
+        test_solutions = []
+
         batch_scores = [0]*batch_size
+        batch_solutions = [0]*batch_size
 
         test_envs = np.array([None]*batch_size)
         obs_batch = []
@@ -548,6 +551,8 @@ class DQN:
 
             i = 0
             for env, action in zip(test_envs, actions):
+                # For type hints
+                env : SpinSystemBase = env
 
                 if env is not None:
                     obs, rew, done, info = env.step(action)
@@ -556,21 +561,30 @@ class DQN:
                         batch_scores[i] += rew
 
                     if done:
+                        if self.test_metric == TestMetric.BEST:
+                            batch_scores[i] = env.best_score
+                            batch_solutions[i] = env.best_solution
+                        elif self.test_metric == TestMetric.FINAL:
+                            batch_scores[i] = env.scorer.get_score(env.state[0, :env.n_spins], env.matrix)
+                            batch_solutions[i] = env.scorer.get_solution(env.state[0, :env.n_spins], env.matrix)
+                            
+                        ### We're going to want either best or final score and actual solution
                         ### CONSIDER CHANGING
-                        if self.test_metric == TestMetric.BEST_ENERGY:
-                            batch_scores[i] = env.best_energy
-                        elif self.test_metric == TestMetric.ENERGY_ERROR:
-                            batch_scores[i] = abs(env.best_energy - env.calculate_best()[0])
-                        elif self.test_metric == TestMetric.MAX_CUT or self.test_metric == TestMetric.MIN_CUT:
-                            batch_scores[i] = env.get_best_cut()
-                        elif self.test_metric == TestMetric.FINAL_CUT:
-                            batch_scores[i] = env.scorer.get_score(self.env.state[0, :self.env.n_spins], self.env.matrix)
-                        elif self.test_metric == TestMetric.FINAL_COVER:
-                            batch_scores[i] = env.calculate_mvc()
-                        elif self.test_metric == TestMetric.BEST_COVER:
-                            batch_scores[i] = env.get_best_cover()
+                        # if self.test_metric == TestMetric.BEST_ENERGY:
+                        #     batch_scores[i] = env.best_energy
+                        # elif self.test_metric == TestMetric.ENERGY_ERROR:
+                        #     batch_scores[i] = abs(env.best_energy - env.calculate_best()[0])
+                        # elif self.test_metric == TestMetric.MAX_CUT or self.test_metric == TestMetric.MIN_CUT:
+                        #     batch_scores[i] = env.get_best_cut()
+                        # elif self.test_metric == TestMetric.FINAL_CUT:
+                        #     batch_scores[i] = env.scorer.get_score(self.env.state[0, :self.env.n_spins], self.env.matrix)
+                        # elif self.test_metric == TestMetric.FINAL_COVER:
+                        #     batch_scores[i] = env.calculate_mvc()
+                        # elif self.test_metric == TestMetric.BEST_COVER:
+                        #     batch_scores[i] = env.get_best_cover()
 
                         test_scores.append(batch_scores[i])
+                        test_solutions.append(batch_solutions[i])
 
                         if self.test_metric == TestMetric.CUMULATIVE_REWARD:
                             batch_scores[i] = 0
@@ -585,7 +599,7 @@ class DQN:
         if self.test_metric == TestMetric.ENERGY_ERROR:
             print("\n{}/{} graphs solved optimally".format(np.count_nonzero(np.array(test_scores)==0),self.test_episodes), end="")
 
-        return np.mean(test_scores)
+        return (np.mean(test_scores), np.mean(test_solutions))
 
     def save(self, path='network.pth'):
         if os.path.splitext(path)[-1]=='':
