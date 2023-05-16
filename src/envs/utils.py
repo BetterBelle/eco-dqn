@@ -40,44 +40,39 @@ class Observable(Enum):
     # Local observations that differ between nodes.
     SPIN_STATE = 1 # The state of vertices
     IMMEDIATE_QUALITY_CHANGE = 2 # The immediate quality change on vertex flip
-    TIME_SINCE_FLIP = 3 # The number of steps since the vertex was changed
+    IMMEDIATE_VALIDITY_DIFFERENCE = 3 # Immediate change in how much closer to a valid candidate the current state is on flip
+    IMMEDIATE_VALIDITY_CHANGE = 4 # Whether the solution becomes valid on flip
+    TIME_SINCE_FLIP = 5 # The number of steps since the vertex was changed
 
     # Global observations that are the same for all nodes.
-    EPISODE_TIME = 4 # The current duration of the episode
-    TERMINATION_IMMANENCY = 5 # Number of steps until termination
-    NUMBER_OF_GREEDY_ACTIONS_AVAILABLE = 6 # Number of actions that immediately increase the reward
-    DISTANCE_FROM_BEST_SCORE = 7 # Difference between best score and current
-    DISTANCE_FROM_BEST_STATE = 8 # Distance from best set to current
-
-    # Observations for problems with invalid solutions
-    IMMEDIATE_VALIDITY_DIFFERENCE = 9 # Immediate change in how much closer to a valid candidate the current state is on flip
-    GLOBAL_VALIDITY_DIFFERENCE = 10 # Difference between validity of best seen to current
-    VALIDITY_BIT = 11 # Whether the current state is a valid one
+    EPISODE_TIME = 6 # The current duration of the episode
+    TERMINATION_IMMANENCY = 7 # Number of steps until termination
+    NUMBER_OF_QUALITY_IMPROVEMENTS = 8 # Number of actions that immediately increase the quality (regardless of validity)
+    NUMBER_OF_VALIDITY_IMPROVEMENTS = 9 # Number of actions that immediately improve the validity
+    DISTANCE_FROM_BEST_SOLUTION = 10 # Difference between best solution and current
+    DISTANCE_FROM_BEST_STATE = 11 # Distance from best set to current
+    GLOBAL_VALIDITY_DIFFERENCE = 12 # Difference between validity of best seen to current
+    VALIDITY_BIT = 13 # Whether the current state is a valid one
 
 DEFAULT_OBSERVABLES = [Observable.SPIN_STATE,
                        Observable.IMMEDIATE_QUALITY_CHANGE,
                        Observable.TIME_SINCE_FLIP,
-                       Observable.DISTANCE_FROM_BEST_SCORE,
+                       Observable.DISTANCE_FROM_BEST_SOLUTION,
                        Observable.DISTANCE_FROM_BEST_STATE,
-                       Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE,
+                       Observable.NUMBER_OF_QUALITY_IMPROVEMENTS,
                        Observable.TERMINATION_IMMANENCY]
-
-# Don't use immediate reward available because it's implied from the spin state with MVC because it's just +1 or -1
-VALID_MVC_OBSERVABLES = [Observable.SPIN_STATE,
-                        Observable.TIME_SINCE_FLIP,
-                        Observable.DISTANCE_FROM_BEST_SCORE,
-                        Observable.DISTANCE_FROM_BEST_STATE,
-                        Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE,
-                        Observable.TERMINATION_IMMANENCY]
 
 # When invalid states are available for choosing, add observables
 MVC_OBSERVABLES = [Observable.SPIN_STATE,
-                   Observable.TIME_SINCE_FLIP,
-                   Observable.DISTANCE_FROM_BEST_SCORE,
-                   Observable.DISTANCE_FROM_BEST_STATE,
-                   Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE,
-                   Observable.TERMINATION_IMMANENCY,
+                   Observable.IMMEDIATE_VALIDITY_CHANGE,
                    Observable.IMMEDIATE_VALIDITY_DIFFERENCE,
+                   Observable.IMMEDIATE_VALIDITY_CHANGE,
+                   Observable.TIME_SINCE_FLIP,
+                   Observable.TERMINATION_IMMANENCY,
+                   Observable.DISTANCE_FROM_BEST_SOLUTION,
+                   Observable.DISTANCE_FROM_BEST_STATE,
+                   Observable.NUMBER_OF_QUALITY_IMPROVEMENTS,
+                   Observable.NUMBER_OF_VALIDITY_IMPROVEMENTS,
                    Observable.GLOBAL_VALIDITY_DIFFERENCE,
                    Observable.VALIDITY_BIT]
 

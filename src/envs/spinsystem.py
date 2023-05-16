@@ -163,12 +163,14 @@ class SpinSystemBase(ABC):
         self.reset()
 
         self.score = self.scorer.get_score(self.state[0, :self.n_spins], self.matrix)
+        self.normalized_score = self.scorer.get_normalized_score(self.state[0, :self.n_spins], self.matrix)
 
         if self.reward_signal == RewardSignal.SINGLE:
             self.init_score = self.score
 
         self.best_score = self.score
         self.best_spins = self.state[0,:]
+        self.best_score_normalized = self.normalized_score
 
         if init_snap != None:
             self.load_snapshot(init_snap)
@@ -205,19 +207,28 @@ class SpinSystemBase(ABC):
 
         ### Reset the state rewards and greedy actions available, definitely a better name for this function
         self.state = self._reset_state(spins)
+
+        # Now we have a state and we know the graph is valid, set the normalizers for the scorer
+        self.scorer.set_invalidity_normalizer(self.state[0, :self.n_spins], self.matrix)
+        self.scorer.set_quality_normalizer(self.state[0, :self.n_spins], self.matrix)
+
+        # Set the score and normalized score
         self.score = self.scorer.get_score(self.state[0, :self.n_spins], self.matrix)
+        self.normalized_score = self.scorer.get_normalized_score(self.state[0, :self.n_spins], self.matrix)
+        self.solution = self.scorer.get_solution(self.state[0, :self.n_spins], self.matrix)
 
         if self.reward_signal == RewardSignal.SINGLE:
             self.init_score = self.score
+            self.init_score_normalized = self.normalized_score
 
         ### When resetting, the best score and best observed are just the current score
         self.best_score = self.score
+        self.best_score_normalized = self.normalized_score
         self.best_obs_score = self.score
-
-        ### TODO: SET THE NORMALIZED SCORE AS WELL SO WE DON'T HAVE TO RECOMPUTE IT
+        self.best_obs_score_normalized = self.normalized_score
 
         ### Best solution is the actual solution of the current state, not the score
-        self.best_solution = self.scorer.get_solution(self.state[0, :self.n_spins], self.matrix)
+        self.best_solution = self.solution
 
         ### Best spins is of course state[0, :self.n_spins] because that holds all the spin booleans similar to score
         self.best_spins = self.state[0, :self.n_spins].copy()
@@ -282,19 +293,19 @@ class SpinSystemBase(ABC):
 
         state = state.astype('float')
 
+        immediate_quality_changes = self.scorer.get_solution_quality_mask(state[0, :self.n_spins], self.matrix)
+
         # If any observables other than "immediate energy available" require setting to values other than
         # 0 at this stage, we should use a 'for k,v in enumerate(self.observables)' loop.
         for idx, obs in self.observables:
             if obs==Observable.IMMEDIATE_QUALITY_CHANGE:
-                ### Normalize the immediately available rewards by the maximum reward to get values between 1 and 0
-                state[idx, :self.n_spins] = self.scorer.get_solution_quality_mask(state[0, :self.n_spins], self.matrix) / self.scorer._max_local_reward
+                ### Normalize the immediately available quality change by the maximum reward at initial state
+                state[idx, :self.n_spins] = immediate_quality_changes / self.scorer._max_local_reward
 
-            elif obs==Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE:
-                immediate_rewards_available = self.scorer.get_score_mask(state[0, :self.n_spins], self.matrix)
-                
+            elif obs==Observable.NUMBER_OF_QUALITY_IMPROVEMENTS:
                 ### Every value number of greedy actions available is count of every immediate reward normalized by num vertices
                 ### NOTE: 1 - resulting value gives the inverse of rewards <= 0, so the positive rewards
-                state[idx, :self.n_spins] = 1 - np.sum(immediate_rewards_available <= 0) / self.n_spins
+                state[idx, :self.n_spins] = 1 - np.sum(immediate_quality_changes <= 0) / self.n_spins
 
         return state
 
@@ -396,14 +407,23 @@ class SpinSystemBase(ABC):
                 random_actions = np.random.choice([1, -1], self.n_spins)
                 new_state[0, :] = self.state[0, :] * random_actions
                 new_score = self.scorer.get_score(new_state[0, :self.n_spins], self.matrix)
+                new_score_normalized = self.scorer.get_normalized_score(new_state[0, :self.n_spins], self.matrix)
+
                 delta_score = new_score - self.score
+                delta_score_normalized = new_score_normalized - self.normalized_score
+
                 self.score = new_score
+                self.normalized_score = new_score_normalized
         else:
             # Calculate score change, which is just the index of the action for the current spins
             delta_score = self.scorer.get_score_mask(self.state[0, :], self.matrix)[action]
+            delta_score_normalized = self.scorer.get_normalized_score_mask(self.state[0, :], self.matrix)[action]
+
             # Now change the state
             new_state[0,action] = -self.state[0,action]
+
             self.score += delta_score
+            self.normalized_score += delta_score_normalized
 
         #############################################################################################
         # 2. Calculate reward for action and update anymemory buffers.                              #
@@ -417,14 +437,16 @@ class SpinSystemBase(ABC):
         #############################################################################################
 
         self.state = new_state
-        immediate_quality_change = self.scorer.get_solution_quality_mask(self.state[0, :self.n_spins], self.matrix)
+        immediate_quality_changes = self.scorer.get_solution_quality_mask(self.state[0, :self.n_spins], self.matrix)
+        immediate_invalidity_changes = self.scorer.get_invalidity_degree_mask(self.state[0, :self.n_spins], self.matrix)
         immediate_score_changes = self.scorer.get_score_mask(self.state[0, :self.n_spins], self.matrix)
 
         if self.score > self.best_obs_score:
             if self.reward_signal == RewardSignal.BLS:
-                rew = self.score - self.best_obs_score
                 if self.norm_rewards:
-                    rew /= self.n_spins
+                    rew = self.normalized_score - self.best_obs_score_normalized
+                else:
+                    rew = self.score - self.best_obs_score
 
             ### Don't know what this does as it isn't described in the paper, will ignore for now
             # elif self.reward_signal == RewardSignal.CUSTOM_BLS:
@@ -460,11 +482,13 @@ class SpinSystemBase(ABC):
         if self.score > self.best_score:
             ### TODO: add the normalized version of the score in here as well, so we don't have to recompute it every time
             self.best_score = self.score
+            self.best_score_normalized = self.normalized_score
             self.best_spins = self.state[0, :self.n_spins].copy()
             self.best_solution = self.scorer.get_solution(self.best_spins, self.matrix)
 
         if self.memory_length is not None:
             # For case of finite memory length.
+            ### TODO: Figure out how this works and maybe consider adding normalized score
             self.score_memory[self.idx_memory] = self.score
             self.spins_memory[self.idx_memory] = self.state[0, :self.n_spins]
             self.idx_memory = (self.idx_memory + 1) % self.memory_length
@@ -473,6 +497,7 @@ class SpinSystemBase(ABC):
         else:
             ### TODO: add the normalized version of the score in here as well, so we don't have to recompute it every time
             self.best_obs_score = self.best_score
+            self.best_obs_score_normalized = self.best_score_normalized
             self.best_obs_spins = self.best_spins.copy()
 
         #############################################################################################
@@ -486,7 +511,7 @@ class SpinSystemBase(ABC):
 
             ### Local observables ###
             if observable==Observable.IMMEDIATE_QUALITY_CHANGE:
-                self.state[idx, :self.n_spins] = immediate_quality_change / self.scorer._max_local_reward
+                self.state[idx, :self.n_spins] = immediate_quality_changes / self.scorer._max_local_reward
 
             elif observable==Observable.TIME_SINCE_FLIP:
                 self.state[idx, :] += (1. / self.max_steps)
@@ -496,7 +521,10 @@ class SpinSystemBase(ABC):
                     self.state[idx, action] = 0
 
             elif observable==Observable.IMMEDIATE_VALIDITY_DIFFERENCE:
-                self.state[idx, :] = self.scorer.get_invalidity_degree_mask(self.state[0, :self.n_spins], self.matrix) / self.scorer._invalidity_normalizer
+                self.state[idx, :self.n_spins] = immediate_invalidity_changes / self.scorer._invalidity_normalizer
+
+            elif observable==Observable.IMMEDIATE_VALIDITY_CHANGE:
+                self.state[idx, :self.n_spins] = self.scorer.get_validity_mask(self.state[0, :self.n_spins], self.matrix) 
 
             ### Global observables ###
             elif observable==Observable.EPISODE_TIME:
@@ -506,21 +534,25 @@ class SpinSystemBase(ABC):
                 # Update 'Immanency of episode termination'
                 self.state[idx, :] = max(0, ((self.current_step - self.max_steps) / self.horizon_length) + 1)
 
-            elif observable==Observable.NUMBER_OF_GREEDY_ACTIONS_AVAILABLE:
-                self.state[idx, :] = 1 - np.sum(immediate_score_changes <= 0) / self.n_spins
+            elif observable==Observable.NUMBER_OF_QUALITY_IMPROVEMENTS:
+                self.state[idx, :] = 1 - np.sum(immediate_quality_changes <= 0) / self.n_spins
 
-            elif observable==Observable.DISTANCE_FROM_BEST_SCORE:
-                self.state[idx, :] = np.abs(self.score - self.best_obs_score) / self.scorer._max_local_reward
+            elif observable==Observable.DISTANCE_FROM_BEST_SOLUTION:
+                self.state[idx, :] = np.abs(self.solution - self.best_solution) / self.scorer._max_local_reward
+
+            elif observable==Observable.NUMBER_OF_VALIDITY_IMPROVEMENTS:
+                self.state[idx, :] = np.sum(immediate_invalidity_changes > 0) / self.n_spins
 
             elif observable==Observable.DISTANCE_FROM_BEST_STATE:
                 self.state[idx, :] = np.count_nonzero(self.best_obs_spins[:self.n_spins] - self.state[0, :self.n_spins])
 
             elif observable==Observable.GLOBAL_VALIDITY_DIFFERENCE:
-                self.state[idx, :] = self.get_edges_uncovered(self.state[0, :self.n_spins], self.matrix) - self.get_edges_uncovered(self.best_obs_spins, self.matrix)
+                current_invalidity = self.scorer.get_invalidity_degree(self.state[0, :self.n_spins], self.matrix)
+                best_invalidity = self.scorer.get_invalidity_degree(self.best_spins[:self.n_spins], self.matrix)
+                self.state[idx, :] = (current_invalidity - best_invalidity) / self.scorer._invalidity_normalizer
 
             elif observable==Observable.VALIDITY_BIT:
-                # if number of edges uncovered is 0, then valid (True)
-                self.state[idx, :] = self.get_edges_uncovered(self.state[0, :self.n_spins], self.matrix) == 0
+                self.state[idx, :] = self.scorer.is_valid(self.state[0, :self.n_spins], self.matrix)
 
 
         #############################################################################################

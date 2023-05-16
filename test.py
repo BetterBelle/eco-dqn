@@ -77,9 +77,11 @@ chosen_nodes = np.array([-1, -1, -1, -1, 1, 1], dtype=np.float64)
 
 
 full = calculate_mvc_rewards_available(adjacency_matrix, chosen_nodes)
-print(_calculate_mvc_score_change(chosen_nodes, adjacency_matrix, 2))
-print(adjacency_matrix)
-print(full)
+# print(_calculate_mvc_score_change(chosen_nodes, adjacency_matrix, 2))
+# print(adjacency_matrix)
+# print(full)
+
+print(op.matmul(adjacency_matrix * np.array([chosen_nodes == -1]), chosen_nodes))
 
 
 graph = nx.Graph(adjacency_matrix)
