@@ -151,21 +151,18 @@ class ScoreSolver(ABC):
 class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
     def __init__(self, problem_type: OptimisationTarget, is_biased_graph: bool):
         super().__init__(problem_type, is_biased_graph)
-        raise NotImplementedError("This optimizer is not implemented : %s", problem_type)
     
     @staticmethod
-    @jit(nopython=True)
     def _get_uncovered_edges(spins : ArrayLike, matrix : ArrayLike) -> float:
         """
         Gets the number of uncovered edges by the spins in the solution on the matrix
         """
-        # np.array([spins == -1]) gives an array with 0s where there are nodes in the solution. Multiplying
-        # by the matrix gives the uncovered edges (counted twice, as it'll be bi-directional due to undirected graph)
-        # therefore divide by two to get number of uncovered edges
-        return matrix * np.array([spins == -1]) * np.array([spins == -1]).T / 2
+        # np.array([spins == -1) gives an array with 0s where there are nodes in the solution. Multiplying
+        # by the matrix gives the matrix with only uncovered edges (counted twice, as it'll be bi-directional due to undirected graph)
+        # therefore sum and divide by two to get number of uncovered edges
+        return np.sum(matrix * np.array([spins == -1]) * np.array([spins == -1]).T) / 2
     
     @staticmethod
-    @jit(nopython=True)
     def _get_newly_covered(spins : ArrayLike, matrix : ArrayLike) -> NDArray:
         """
         Gets the number of newly uncovered edges for each vertex flip. This value is positive if it increases the number of covered
@@ -176,7 +173,7 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         # by a vertex in the solution (other than itself if it is in the solution) for each vertex, or 0 if there are no uncovered edges
         # Therefore by multiplying this new array by the vertices themselves, you get how many edges get covered on flipping that 
         # vertex, negative values indicating that it reduces the number of covered edges.
-        return spins * op.matmul(matrix * (spins == -1), spins)
+        return spins * op.matmul(matrix * np.array(spins == -1, dtype=np.float64), spins)
     
     def set_max_local_reward(self, spins: ArrayLike, matrix: ArrayLike) -> None:
         """
@@ -203,7 +200,11 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
     def get_solution(self, spins: ArrayLike, matrix: ArrayLike) -> float:
         """
         The solution for the minimum vertex cover is just the size of the solution set. So sum of spins == 1.
+        However, if it's an invalid solution, we'll set the solution to the number of vertices (worse solution)
         """
+        if not self.is_valid(spins, matrix):
+            return len(spins)
+        
         return np.sum(spins == 1)
 
     def get_solution_quality_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
@@ -279,7 +280,7 @@ class MaximumCutUnbiasedScorer(ScoreSolver):
 
     ### Following methods are private static jit methods for speedup
     @staticmethod
-    @jit(float64[:](float64[:],float64[:,:]), nopython=True)
+    @jit(nopython=True)
     def _solution_quality_mask_calculator(spins : ArrayLike, matrix: ArrayLike) -> NDArray:
         """
         Quick computation of the quality mask

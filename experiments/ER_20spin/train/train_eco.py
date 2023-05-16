@@ -41,7 +41,7 @@ def run(save_loc="ER_20spin/eco/max_cut"):
                 'reward_signal':RewardSignal.BLS,
                 'extra_action':ExtraAction.NONE,
                 'optimisation_target':OptimisationTarget.CUT,
-                'spin_basis':SpinBasis.BINARY,
+                'spin_basis':SpinBasis.SIGNED,
                 'norm_rewards':True,
                 'memory_length':None,
                 'horizon_length':None,
