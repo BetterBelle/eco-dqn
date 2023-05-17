@@ -136,7 +136,7 @@ class ScoreSolver(ABC):
         # (negative getting closer to validity), we can just add the current validity degree to the invalidity degree mask,
         # giving us the new degree of invalidity for each flip. Checking which ones are zeros gives us the bitmask for valid solutions.
         new_validity_degree = self.get_invalidity_degree(spins, matrix) + self.get_invalidity_degree_mask(spins, matrix)
-        return np.all(new_validity_degree == 0)
+        return new_validity_degree == 0
 
 
     def is_valid(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> bool:
@@ -272,7 +272,7 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         """
         # For MVC, we'll just ignore weighted graphs and pretend they're unweighted
         matrix = np.array(matrix != 0, dtype=np.float64)
-        
+
         updated_quality = self.get_solution_quality(spins, matrix) + self.get_solution_quality_mask(spins, matrix)
         updated_quality /= self._solution_quality_normalizer
 
