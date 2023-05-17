@@ -160,6 +160,9 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         # np.array([spins == -1) gives an array with 0s where there are nodes in the solution. Multiplying
         # by the matrix gives the matrix with only uncovered edges (counted twice, as it'll be bi-directional due to undirected graph)
         # therefore sum and divide by two to get number of uncovered edges
+        
+        # For MVC, we'll just ignore weighted graphs and pretend they're unweighted
+        matrix = np.array(matrix != 0, dtype=np.float64)
         return np.sum(matrix * np.array([spins == -1]) * np.array([spins == -1]).T) / 2
     
     @staticmethod
@@ -173,6 +176,9 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         # by a vertex in the solution (other than itself if it is in the solution) for each vertex, or 0 if there are no uncovered edges
         # Therefore by multiplying this new array by the vertices themselves, you get how many edges get covered on flipping that 
         # vertex, negative values indicating that it reduces the number of covered edges.
+        
+        # For MVC, we'll just ignore weighted graphs and pretend they're unweighted
+        matrix = np.array(matrix != 0, dtype=np.float64)
         return spins * op.matmul(matrix * np.array(spins == -1, dtype=np.float64), spins)
     
     def set_max_local_reward(self, spins: ArrayLike, matrix: ArrayLike) -> None:
@@ -181,6 +187,10 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         The max cut uses the maximum change in cut from an empty solution, but we'll use the maximum degree + number of nodes.
         This is to change the normalization depending on the graph topology.
         """
+
+        # For MVC, we'll just ignore weighted graphs and pretend they're unweighted
+        matrix = np.array(matrix != 0, dtype=np.float64)
+
         ### op.matmul(matrix * spins, spins) gives the degree of each node
         self._max_local_reward = len(spins) + np.max(op.matmul(matrix * spins, spins))
 
@@ -189,6 +199,8 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         To normalize the invalidity, we'll want to use the total number of edges in the graph.
         This is just the sum of every value in the matrix divided by 2, because it's an unweighted undirected graph.
         """
+        # For MVC, we'll just ignore weighted graphs and pretend they're unweighted
+        matrix = np.array(matrix != 0, dtype=np.float64)
         self._invalidity_normalizer = np.sum(matrix) / 2
 
     def set_quality_normalizer(self, spins: ArrayLike, matrix: ArrayLike) -> None:
@@ -241,6 +253,9 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         The score mask is the change in score for every vertex flip. We therefore need to compute the new quality and invalidity degree
         for each vertex flip.
         """
+        # For MVC, we'll just ignore weighted graphs and pretend they're unweighted
+        matrix = np.array(matrix != 0, dtype=np.float64)
+
         # Solution quality on each flip is just the current quality + the mask
         # because solution quality ignores validity
         updated_quality = self.get_solution_quality(spins, matrix) + self.get_solution_quality_mask(spins, matrix)
@@ -255,6 +270,9 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         """
         Same calculations as the score mask, but normalize
         """
+        # For MVC, we'll just ignore weighted graphs and pretend they're unweighted
+        matrix = np.array(matrix != 0, dtype=np.float64)
+        
         updated_quality = self.get_solution_quality(spins, matrix) + self.get_solution_quality_mask(spins, matrix)
         updated_quality /= self._solution_quality_normalizer
 
