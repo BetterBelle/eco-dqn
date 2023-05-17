@@ -306,7 +306,7 @@ class SpinSystemBase(ABC):
                 state[idx, :self.n_spins] = immediate_invalidity_changes / self.scorer._invalidity_normalizer
 
             elif obs==Observable.IMMEDIATE_VALIDITY_CHANGE:
-                state[idx, :self.n_spins] = self.scorer.get_validity_mask(self.state[0, :self.n_spins], self.matrix) 
+                state[idx, :self.n_spins] = self.scorer.get_validity_mask(state[0, :self.n_spins], self.matrix) 
 
             ### Global observables ###
             elif obs==Observable.NUMBER_OF_QUALITY_IMPROVEMENTS:
@@ -316,7 +316,7 @@ class SpinSystemBase(ABC):
                 state[idx, :] = np.sum(immediate_invalidity_changes > 0) / self.n_spins
 
             elif obs==Observable.VALIDITY_BIT:
-                state[idx, :] = self.scorer.is_valid(self.state[0, :self.n_spins], self.matrix)
+                state[idx, :] = self.scorer.is_valid(state[0, :self.n_spins], self.matrix)
 
         return state
 
