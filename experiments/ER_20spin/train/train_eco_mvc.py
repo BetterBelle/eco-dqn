@@ -95,7 +95,7 @@ def run(save_loc="ER_20spin/eco/min_cover"):
 
     mk_dir(data_folder)
     mk_dir(network_folder)
-    # print(data_folder)
+    
     network_save_path = os.path.join(network_folder,'network.pth')
     test_save_path = os.path.join(network_folder,'test_scores.pkl')
     loss_save_path = os.path.join(network_folder, 'losses.pkl')

@@ -15,5 +15,5 @@ log_data.pkl
 .xdp*
 
 # Ignore network weights and pickles
-*.pth
+network[0-9]*.pth
 *.pkl
