@@ -205,7 +205,7 @@ class SpinSystemBase(ABC):
         else:
             self.scorer.set_max_local_reward(empty_solution, self.matrix)
 
-        ### Reset the state rewards and greedy actions available, definitely a better name for this function
+        ### Reset the state, does not include things relative to the best state because it's not yet set and the best state is the current one
         self.state = self._reset_state(spins)
 
         # Now we have a state and we know the graph is valid, set the normalizers for the scorer
@@ -276,8 +276,6 @@ class SpinSystemBase(ABC):
         The state's immediate reward and greedy actions get reset based on current spins selected
         Note that for unreversible spins (i.e. S2V) all spins are set to 1 and can be flipped to -1 but for reversibles
         the spins get set to a random value either 1 or -1. If a spin list is passed in, we format them to be signed.
-
-        Because of matrix multiplication being useful for computing max cut here, they format the spins to floats for parallelisation. 
         """
         state = np.zeros((self.observation_space.shape[1], self.n_actions))
 
@@ -294,18 +292,31 @@ class SpinSystemBase(ABC):
         state = state.astype('float')
 
         immediate_quality_changes = self.scorer.get_solution_quality_mask(state[0, :self.n_spins], self.matrix)
+        immediate_invalidity_changes = self.scorer.get_invalidity_degree_mask(state[0, :self.n_spins], self.matrix)
 
         # If any observables other than "immediate energy available" require setting to values other than
         # 0 at this stage, we should use a 'for k,v in enumerate(self.observables)' loop.
         for idx, obs in self.observables:
+
+            ### Local observables ###
             if obs==Observable.IMMEDIATE_QUALITY_CHANGE:
-                ### Normalize the immediately available quality change by the maximum reward at initial state
                 state[idx, :self.n_spins] = immediate_quality_changes / self.scorer._max_local_reward
 
+            elif obs==Observable.IMMEDIATE_VALIDITY_DIFFERENCE:
+                state[idx, :self.n_spins] = immediate_invalidity_changes / self.scorer._invalidity_normalizer
+
+            elif obs==Observable.IMMEDIATE_VALIDITY_CHANGE:
+                state[idx, :self.n_spins] = self.scorer.get_validity_mask(self.state[0, :self.n_spins], self.matrix) 
+
+            ### Global observables ###
             elif obs==Observable.NUMBER_OF_QUALITY_IMPROVEMENTS:
-                ### Every value number of greedy actions available is count of every immediate reward normalized by num vertices
-                ### NOTE: 1 - resulting value gives the inverse of rewards <= 0, so the positive rewards
-                state[idx, :self.n_spins] = 1 - np.sum(immediate_quality_changes <= 0) / self.n_spins
+                state[idx, :] = np.sum(immediate_quality_changes > 0) / self.n_spins
+
+            elif obs==Observable.NUMBER_OF_VALIDITY_IMPROVEMENTS:
+                state[idx, :] = np.sum(immediate_invalidity_changes > 0) / self.n_spins
+
+            elif obs==Observable.VALIDITY_BIT:
+                state[idx, :] = self.scorer.is_valid(self.state[0, :self.n_spins], self.matrix)
 
         return state
 
@@ -535,7 +546,7 @@ class SpinSystemBase(ABC):
                 self.state[idx, :] = max(0, ((self.current_step - self.max_steps) / self.horizon_length) + 1)
 
             elif observable==Observable.NUMBER_OF_QUALITY_IMPROVEMENTS:
-                self.state[idx, :] = 1 - np.sum(immediate_quality_changes <= 0) / self.n_spins
+                self.state[idx, :] = np.sum(immediate_quality_changes > 0) / self.n_spins
 
             elif observable==Observable.DISTANCE_FROM_BEST_SOLUTION:
                 self.state[idx, :] = np.abs(self.solution - self.best_solution) / self.scorer._max_local_reward
