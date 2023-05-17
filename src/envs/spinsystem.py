@@ -549,10 +549,14 @@ class SpinSystemBase(ABC):
                 self.state[idx, :] = np.sum(immediate_quality_changes > 0) / self.n_spins
 
             elif observable==Observable.DISTANCE_FROM_BEST_SOLUTION:
-                self.state[idx, :] = np.abs(self.solution - self.best_solution) / self.scorer._max_local_reward
+                current_quality = self.scorer.get_solution_quality(self.state[0, :self.n_spins], self.matrix)
+                best_quality = self.scorer.get_solution_quality(self.best_spins[:self.n_spins], self.matrix)
+                self.state[idx, :] = np.abs(current_quality - best_quality) / self.scorer._max_local_reward
 
             elif observable==Observable.NUMBER_OF_VALIDITY_IMPROVEMENTS:
-                self.state[idx, :] = np.sum(immediate_invalidity_changes > 0) / self.n_spins
+                # Immediate invalidity is negative when getting closer to a valid solution
+                # Therefore we want the number of negative values.
+                self.state[idx, :] = np.sum(immediate_invalidity_changes < 0) / self.n_spins
 
             elif observable==Observable.DISTANCE_FROM_BEST_STATE:
                 self.state[idx, :] = np.count_nonzero(self.best_obs_spins[:self.n_spins] - self.state[0, :self.n_spins])

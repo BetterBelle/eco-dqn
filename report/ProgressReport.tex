@@ -1,5 +1,8 @@
 \documentclass{article}
 \usepackage{amsmath}
+\usepackage{graphicx}
+
+\graphicspath{{../src}}
 
 \title{Progress Report}
 \author{Annabelle Cloutier}
@@ -137,25 +140,29 @@ Everything outside of observations (input) and Q-values (output) only propagates
 
 It is possible for more complex problems that some of the internal structure for the message and update sections of the network may have to change in order to accommodate for extra information. It is also possible that global observations could be embedded somewhere within the internal structure of the network instead of as input observations for every vertex.
 
-The main issue comes with the output and it's interpretation. Each vertex is represented by a single value as the output, and that value is interpreted as adding or removing it from the solution set, in the context where the solution is a subset of the vertices in the graph. More specifically for the Max Cut problem, the vertex associated with the maximum Q-value (output value) is taken and then either added or removed from the solution set, depending on whether it already belongs to it or not. 
+The main issue comes with the output and it's interpretation. Each vertex is represented by a single value as the output, and that value is interpreted as adding or removing it from the solution set, in the context where the solution is a subset of the vertices in the graph. More specifically for the Max Cut problem, the vertex associated with the maximum Q-value (output value) is taken and then either added or removed from the solution set, depending on whether it already belongs to it or not. This approach works fine for a problem like Maximum Cut or Minimum Vertex Cover where the solution can be represented as a set representing chosen vertices for the solution, however any extra constraints forces the output interpretation to be completely redesigned. 
 
-This approach works fine for a problem like Maximum Cut or Minimum Vertex Cover where the solution can be represented as a set representing chosen vertices for the solution, however any extra constraints forces the output interpretation to be completely redesigned.
+For example, the Traveling Salesman Problem where the solution is an ordered list of vertices would not correctly work as the current implementation of simply adding or removing a vertex from the solution could not work or would have to be changed significantly for this problem.
 
-For example, the Traveling Salesman Problem where the solution is an ordered list of vertices would not correctly work as the current implementation of simply adding or removing a vertex from the solution could not work.
+The Minimum K-Cut Problem which can have an arbitrary number partitions of the graph would also not work with the current model as it would require extra decision making on deciding which set to move a vertex to. Because the number of sets can also change, this means the size of the output would have to change as the solution changes which isn't possible, or some significant rework of the output interpretation would have to be made.
 
-The Minimum K-Cut Problem which can have an arbitrary number partitions of the graph would also not work with the current model as it would require extra decision making on deciding which set to move a vertex to.
-
-The Minimum Bisection Problem can be represented as a set of chosen vertices, however the extra constraint that the number of chosen vertices has to be the same as the number of unchosen vertices makes the current output interpretation incomplete for solving this problem.
+The Minimum Bisection Problem can be represented as a set of chosen vertices, however the extra constraint that the number of chosen vertices has to be the same as the number of unchosen vertices makes the current output interpretation incomplete for solving this problem. The same principle applies to the Minimum Vertex Cover, as it is possible to create invalid solutions for this problem. 
 
 \subsection{Benchmarks}
 
 The paper displays the performance of the graph in reference to S2V-DQN, a similar paper where the algorithm does not allow for reversing actions as well as a greedy algorithm. It also compares it's performance against modifications of itself, namely where some observations are restricted, intermediate rewards are not given for reaching locally optimal solutions, as well as keeping it from reversing its actions. 
 
-They use GSet graphs G1-10 and G22-32 for calculating the approximation ratio, as well as the Physics dataset. 
+They also include the MaxCutApprox algorithm, which is a greedy algorithm choosing the vertex that provides the greatest cut improvment until it can't improve the cut any more. They implement two variations of this, one where it can reverse actions and one where it can't. 
+
+They also use an approximation ratio $C(S^*)/C(S_{opt})$. However, because $S_{opt}$ cannot be calculated exactly, they use multiple optimizations. Specifically, they use CPLEX, an integer programming solver, as well as a pair of simulated annealing heuristics by Tiunov \textit{et al.} (2019) and Leleu \textit{et al.} (2019) in order to calculate $S_{opt}$. 
+
+The implementation of these different algorithms is not included in the codebase provided. However the optimal solutions and cut values for the ER graphs with 40 vertices are provided for the testing graphs. The validation graphs all have their maximum cut values included.
+
+They use GSet graphs G1-10 and G22-32 as well as the Physics/Ising dataset as benchmark graphs. These, as well as their optimal cuts and solutions are provided in the codebase. 
 
 \subsection{Graph Generation}
 
-They train and test on Erdos-Renyi \cite{erdos} and Barabasi-Albert \cite{albert} graphs.
+They train and test on Erdos-Renyi \cite{erdos} and Barabasi-Albert \cite{albert} graphs. For training, they generate random graphs and traverse them, adding each state, action and reward to the experience replay memory. For testing, they have a set of 50 graphs matching the parameters of the training graphs, being either ER or BA graphs with the same number of vertices.
 
 \section{Code}
 
@@ -163,21 +170,27 @@ The code holds the capability of running all of the above tests, but they're not
 
 \subsection{Running Code}
 
-They very generously provide a README file that specifies the exact commands to run in order to train, test and validate networks. However, there is no code for reproducing their specific tests. These all need to be hand-coded. The only results I've reproduced so far are training and testing.
+They very generously provide a README file that specifies the exact commands to run in order to train, test and validate networks. However, there is no code for reproducing their specific tests. These all need to be hand-coded. The only results I've reproduced so far are training and testing. These files can be modified easily to change where the network weights are stored, as well as the training result graphs and data. 
 
 \subsection{Graph Generation}
 
-Unsure of the exact implementation, it seems they use NetworkX's ability to generate random graphs in order to do this. It's completely unnecessary though seeing as they have many test, validation and benchmark graphs pre-built within their code that can be used. If absolutely necessary, creating random graphs and storing them within a pickle file as they do would likely lower the workload on inputs as the code for parsing through these types of files is already prebuilt.
+Unsure of the exact implementation, it seems they use NetworkX's ability to generate random graphs in order to do this. For training, they use the classes defined in src/envs/utils to generate new graphs at each step, adding every action done on the new graphs to the experience replay memory which is used to train the network. This ensures every training session is random and includes different data. The testing graphs are all the same, but change depending on the size of the training networks. For example, a network trained on graphs with 40 vertices will also have it's performance tested on graphs with 40 vertices. 
 
-The code for generating new random graphs exists in src/envs/utils. This includes the code for generating Erdos-Renyi and Barabasi-Albert graphs, as well as classes for numerous other types of random graphs.
+\section{Minimum Cut}
 
-\subsection{Input Conversion}
+The Minimum Cut is not an NP-Hard problem, but it is still a combinatorial optimization problem that could be solved by ECO-DQN. To confirm that the idea is expandable to other problems, we'll train an identical structure, using the negative of the cut value for determining the solution's reward with respect to the best observed, forcing the network to minimize the cut instead of maximize it. 
 
-The code for converting graphs into observations seems to exist within the file src/envs/spinsystem.py but further code inspection is needed to see exactly how this information is represented and decoded by the agent.
+$R(S) = max(0, -C(S) - -C(S^*))$. 
 
-\subsection{Benchmarks}
+\subsection{Results}
 
-They generously provide testing, validation and benchmark graphs in Pickle files, which is a special type of object file for Python, as well as their solutions, which are also stored in Pickle files, but are simply a boolean (technically floats, just 1.0 and 0.0) list for determining whether a vertex is in the solution set or not.
+The result of training this network is very similar to the maximum cut. It starts giving random solutions and eventually reaches a point where the cut value found stabilizes on the test graphs. This demonstrates that the network structure can be utilized to solve other problems.
+
+\includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/loss.png}
+
+\includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/training_curve.png}
+
+This could be further tested to compare against existing algorithms for the Minimum Cut, but this at least shows promise.
 
 \section{Minimum Vertex Cover}
 
@@ -188,7 +201,7 @@ A vertex cover is a set of vertices such that every edge in a graph has at least
     \item What will the reward be for finding a valid solution 
     \item What will be the punishment (if any) for finding sets that are invalid solutions 
     \item Should an intermediate reward be used for finding valid solutions that are locally optimal
-    \item Should we allow invalid candidate solutions
+    \item Should we allow invalid candidate solutions 
 \end{enumerate}
 
 Thankfully, some of these are somewhat trivial to solve, like the observations and reward, by either using ideas from ECO-DQN \cite{eco-dqn} and the similar S2V-DQN \cite{s2v-dqn} which does not allow for exploration/undoing actions but does tackle the Minimum Vertex Cover.
@@ -202,44 +215,41 @@ In ECO-DQN, they have their set of observations from which we can draw to design
 \begin{itemize}
     \item Observation 1, "Vertex sate, i.e. if $v$ is currently in the solution set, $S$" is very easily translatable. We can directly copy this information, irrespective of if the current state is a valid solution.
     \item Observation 3 "Steps since the vertex state was last changed". This one also can be directly copied.
-    \item Observation 4 "Difference of current cut-value from best observed". We will translate this to the difference between the current cover set size and the best observed.
+    \item Observation 4 "Difference of current cut-value from best observed". We will translate this to the difference between the current cover set size and the best cover set size. For this, we'll ignore the validity of the solution.
     \item Observation 5 "Distance of current solution set from the best observed". In the paper they do not define this, but it is explained through their implementation in Section \ref{node-embedding}, Node Embeddings. We can also use this information for the Minimum Vertex Cover in the same way.
-    \item Observation 6 "Number of available actions that immediately increase the cut value" can also be translated. Namely, counting the number of actions (or vertices) that when removed from the set will reduce the number of vertices in the cover. 
+    \item Observation 6 "Number of available actions that immediately increase the cut value" can also be translated. Namely, counting the number of actions (or vertices) that when flipped will reduce the number of vertices in the cover. Again, in this case we'll ignore the validity of the solution created by changing that vertex state.
     \item Observation 7 "Steps remaining in the episode". This, once again, can be directly copied.
 \end{itemize}
 
-The observation that will change is the immediate cut change. Due to the nature of the Minimum Vertex Cover, the immediate change in the cover set size is implied by observation one. Therefore, we will change this slightly to instead represent an observation for in the case where we'll allow invalid candidates: 
+Observation 2 in the ECO-DQN paper was the immediate cut change if the vertex state is changed. We would interpret this as the immediate change in the size of the vertex cover's set ignoring validity, but this is implied by Observation 1 for the Minimum Vertex Cover. 
+
+With all of this done, we want to add information about the validity of the solution and the validity of the new solutions for every vertex flip (i.e. local observations for every vertex). Therefore, we can add the following observations:
 
 \begin{enumerate}
-    \item Difference of current edge cover from the best observed. The "edge cover" in this case will be the number of edges covered by the state, which can be less than the total number of edges in the graph.
+    \item Immediate change in the number of edges covered on vertex flip.
+    \item Immediate change in the solution's validity on vertex flip.
+    \item Number of actions that immediately increase the number of edges covered by the solution.
+    \item Difference in number of edges covered from current solution and best observed.
+    \item Validity of current solution. 
 \end{enumerate}
 
-We also want to embed information about the validity of the current state in case we allow invalid candidates, therefore we also add the following observations: 
+This leaves us with the following observations for the Minimum Vertex Cover:
 
 \begin{enumerate}
-    \item Immediate change of edge cover on vertex change, which will compute the difference of the number of edges that are covered by the state for every vertex flip
-    \item Whether the current cover is valid; that it covers all edges.
+    \item Observation 1: Vertex state
+    \item Observation 2: Steps since the vertex was changed 
+    \item Observation 3: Immediate change in the number of edges covered on vertex flip 
+    \item Observation 4: Immediate change in the solution's validity on vertex flip 
+    \item Observation 5: Difference of current set size from best observed 
+    \item Observation 6: Difference of number of edges covered by current solution from best observed 
+    \item Observation 7: Distance of current set from best observed 
+    \item Observation 8: Number of actions that immediately reduce the set size
+    \item Observation 9: Number of actions that immediately increase the number of edges covered by the solution 
+    \item Observation 10: Validity of current solution 
+    \item Observation 11: Steps remaining in episode 
 \end{enumerate}
 
-In the end, we'll have 9 observations, some of them only used for when the network will be permitted to explore candidates that are invalid solutions. Observations 1-6 will be used regardless of whether we allow invalid candidates, observations 7-9 will only be used if we allow invalid candidates.
-
-\begin{enumerate}
-    \item Vertex state i.e. whether the vertex is in the current solution set.
-    \item Steps since the vertex state was last changed.
-    \item Difference of current cover set size from the best observed.
-    \item Distance of current solution set from the best observed. 
-    \item Number of available actions that immediately decrease the number of vertices in the solution.
-    \item Steps remaining in the episode.
-    \item Immediate change in current edges covered.
-    \item Difference of current edges covered from best observed.
-    \item Whether the current cover is a valid cover.
-\end{enumerate}
-
-In this case as with ECO-DQN \cite{eco-dqn}, we have local (1-3, 7) and global (4-6, 8-9) observations.
-
-To start, we'll do a basic algorithm to select edges at random, picking the nodes incident on the edge and removing all edges incident on the chosen nodes until all edges are covered. We will then use this generated solution and give it to the agent as a starting point. In this scenario, we won't allow for invalid candidates, and will give a large negative reward for choosing invalid candidates. If an invalid choice is suggested during test time, we'll generate another random valid solution and get the network to continue from the newly generated solution. 
-
-Where we'll allow for invalid candidates, we'll start with an empty solution set as the first candidate.
+This leaves us with local observations 1-4 and global observations 5-11 which all grant information about the state of the solution at that time. 
 
 \subsection{Reward Shaping}
 
@@ -255,74 +265,52 @@ In S2V-DQN \cite{s2v-dqn}, the reward for a Minimum Vertex Cover they define as 
 
 In our case, the best seen is not so simply defined. Because constructed candidates may not be valid, some way to compare invalid candidates to valid ones has to be devised such that we can choose a previous "best" candidate to use as a comparison for future candidates. What we want is a reward mechanism that allows valid candidates to always be chosen as the best over invalid ones, as well as for valid candidates to be compared to each other in such a way that a candidate that improves the solution gives a better reward than ones that don't. Similarly for invalid candidates, we'd like for them to be compared to each other in such a way that an invalid candidate that is closer in some measure to being a valid solution gives a better reward than one that is further away. One way to do this is to ensure that valid solutions gives positive rewards increasing in magnitude depending on it's quality, and for invalid solutions to give negative rewards increasing in magnitude depending on it's relative lack of closeness to being a valid candidate.
 
-With this in mind, we can define this idea of the "score" of a candidate solution. This score will be used to compare different candidates in the same way that is done in ECO-DQN so valid solutions will always be prioritized. This score function is defined as follows:
+For the Minimum Vertex Cover, the score of a valid candidate can be defined in a similar way as in S2V-DQN by calculating the size of the set not including the solution, $|V / S|$. This grants higher scores to smaller candidate set sizes. Therefore when comparing valid candidates using the same reward function as ECO-DQN, we'll get positive rewards for smaller set sizes. We can of course normalize this value by the number of nodes to accommodate different graph sizes.
 
-$SC(S) = V(S) * SQ(S) - DI(S)$
+For invalid candidates, their scores can be the negative of the number of edges not covered by the candidate. Therefore, invalid candidates being compared will give greater positive rewards for getting closer to a valid solution. Of course, this also will result in positive rewards for moving from an invalid candidate to a valid one. To normalize this, we can use the number of edges in the graph, to account for graphs with differing number of edges. The nice property of using this for getting the score of an invalid candidate is that valid candidates always have exactly zero uncovered edges.
 
-$SC(S)$ is the score of the solution that will be used to compare it to other solutions, and more importantly the previous best seen for determining whether this new solution should take precedence as the new best seen and for calculation for the reward. This can also be used to determine whether we are in a local minimum. $V(S)$ is a validity bit. Therefore $V(S)$ is defined as follows:
+Including these two ideas, we can define the score of a candidate for the Minimum Vertex Cover as being 
 
-\[
-    V(S) =
-    \begin{cases}
-        1,&\text{if S is a valid candidate}\\
-        0,&\text{otherwise}
-    \end{cases}
-\]
+$score(S) = validity(S) * |V - S| - edges_uncovered(S)$. 
 
-$SQ(S)$ is a function defining the value of a solution such that it is larger for a better solution. Intuitively this is the solution's quality. For the Minimum Vertex Cover, this would be the number of vertices not in the cover, $SQ(S) = |V| - |S|$. This way a smaller solution set will have a larger score.
+Normalizing this score would be similar,
 
-$DI(S)$ is the degree of invalidity. This function should be larger the farther away from a valid solution the candidate is. This function should always evaluate to zero for a valid candidate. For the Minimum Vertex Cover, this degree of invalidity can be easily defined by counting the number of edges not covered by the candidate solution. Therefore for the Minimum Vertex Cover, $DI(S) = UncoveredEdges(S)$. 
+$norm_score(S) = validity(S) * |V - S| / |V| - edges_uncovered(S) / |E|$. 
 
-This score function guarantees that valid solutions have a positive score by making it the only existing term and also guarantees that invalid solutions are granted negative scores by ignoring the solution's quality by the validity bit and increasing the magnitude for solutions that require more actions to render valid. 
-
-For computing a reward, we'll use the normalized $SQ(S)$ and $DI(S)$ functions, $NormSQ(S)$ and $NormDI(S)$ where we normalize each to be bounded in $[0, 1]$. For the Minimum Vertex Cover this means dividing by the number of vertices in the graph and for $DI(S)$ we divide by the number of edges in the graph. This new function is $NormSC(S) = V(S) * NormSQ(S) - NormDI(S)$. Therefore we can define the reward in much the same way as DQN:
-
-$R(S) = max(0, NormSC(S) - NormSC(S^*))$
-
-Note that for the maximum cut, this evaluates to the same function used in ECO-DQN because $DI(S) = 0$ and $V(S) = 1$ for the maximum cut. However, this new score function allows us to tackle other problems that have more constraints. This function also allows us to easily find local optimums as the score for flipping other states when compared to a local optimum will always give a negative or zero reward if no better valid solutions are able to be found with one action. The term comparing the normalized scores should also guarantee the following:
+Now, when calculating the reward, we can use the same idea as ECO-DQN, $R(S) = max(0, norm_score(S) - norm_score(S^*))$, where $S^*$ is the previously best seen candidate. Of course, by comparing scores we can select the best score as the best previous candidate, as the scores increase in value for valid candidates of smaller set size and decrease as the set size becomes larger or as the candidate is not valid. The following shows the results of comparing the scores of different solutions $S$ and $S^*$ for determining a new best seen candidate:
 
 \begin{enumerate}
-    \item Invalid $S$ compared to invalid $S^*$ only give positive rewards when $S$ is closer to being valid than $S^*$. 
-    \item Invalid $S$ compared to valid $S^*$ will never give a positive reward. 
-    \item Valid $S$ compared to invalid $S^*$ will always give a positive reward. 
-    \item Valid $S$ compared to valid $S^*$ will only give positive rewards if $S$ is a better solution than $S^*$. 
+    \item Invalid $S$ compared to invalid $S^*$ only give positive rewards when $S$ is closer to being valid than $S^*$. Therefore $S$ is only a better candidate if it covers more edges.
+    \item Invalid $S$ compared to valid $S^*$ will never give a positive reward. Therefore an invalid $S$ cannot become the new best seen if $S^*$ is a valid candidate. This ensures we always return a valid candidate (if one is found) at the end of a search.
+    \item Valid $S$ compared to invalid $S^*$ will always give a positive reward. Therefore is $S^*$ is invalid and $S$ is valid, $S$ becomes the new best seen candidate.
+    \item Valid $S$ compared to valid $S^*$ will only give positive rewards if $S$ is a better solution than $S^*$. Therefore $S$ only become
 \end{enumerate}
 
-This is true for the way we defined our function with the Minimum Vertex Cover. One thing to note is that defining how close we are to a valid solution can be a difficult problem if we define it as the minimum number of actions required to get to a valid state; for the Minimum Vertex Cover, having 2 uncovered edges may only require one action to solve, but could also require two actions to solve depending on the state of the solution set. However, determining the minimum number of actions required to get to a valid solution is just solving the problem excluding the current nodes in the set. Therefore some compromise has to be made. This problem does not exist in the Minimum Bisection for example, where we simply measure the size difference between the two sets, which gives a direct measure for how many actions are required to make a valid solution.
-
-Further, because we're once again using this maximum function, this means the agent doesn't get punished for exploring worse states. This reward function will actually evaluate valid and invalid candidate solutions during exploration evenly when the best observed is a local optimum, meaning it can explore in either direction to find new valid candidates. 
-
-As with ECO-DQN, we'll also give intermediate rewards for finding new local optimums in order to avoid situations where rewards become incredibly scarce and to encourage it to find new locally optimal states to explore. 
-
-For the version of this algorithm where we won't allow for invalid candidates, we'll use this same reward function during training and testing. However, during both, we'll start from a valid candidate and if invalid candidates are suggested, we'll randomize into a new valid candidate. 
-
-The last thing of note is that this reward system also allows us to represent S2V-DQN in the same way and disallowing exploration by starting with an empty candidate and progressively building up the solution, not allowing the network to undo a previously flipped vertex. This means the previously seen optimum will always be the previous state. In our case, the reward at each step is based on how many more edges get covered by the new state instead of only giving the same reward at each step. This may seem greedy and like it would give the same cumulative reward because all valid covers will give the same cumulative reward if you're only counting edges. However, because the end result is a valid solution, the function completely changes in the final step and the cumulative reward will be larger for finding better covers. Therefore, by having a larger reward horizon in the Q function evaluation, which the ECO-DQN paper already does with a $\gamma$ of 0.95, we can guide the network to prefer future rewards more, meaning it will be more likely to prefer smaller covers as it gets more reward for this behavior in the long term. An added benefit of this is that if the function approximation that the network generates is accurate, these larger rewards should be closer to the initial empty candidate and should therefore be easier to find. 
+As with ECO-DQN, we'll also give intermediate rewards for finding new local optimums in order to avoid situations where rewards become incredibly scarce and to encourage it to find new locally optimal states to explore. This reward will be the same amount as well, of $frac{1}{|V|}$.
 
 \subsection{Training}
 
-Training this network will be algorithmically identical to ECO-DQN using the ideas from Deep Q-Learning described in \textit{Mnih et al.} \cite{deepmind_2015}.
+Training this network will be algorithmically identical to ECO-DQN \cite{eco-dqn} using the ideas from Deep Q-Learning described in \textit{Mnih et al.} \cite{deepmind_2015}.
 
-\subsection{Implementation and Results}
+\subsection{Results and Implementation Details}
 
-Notes for when I start implementation: 
+Because the original test graphs were generated using discrete edges weights of either $1$ or $-1$, we first recreate the test graphs with the same edges but setting all the weights to $1$. All of the training graphs will also be generated using uniform weights, on ER graphs with $20$ vertices and edge probability of $0.15$.
 
-\begin{itemize}
-    \item Still need to find Integer Program for comparison. Do this last. It's useless to have one if I can't even get the above working.
-    \item Start with basics: do basic solution of MVC then use the network to refine (i.e. don't allow invalids)
-    \item Because of the generalized nature of it all, consider training on max cut/min cover and then testing on the different problem to see how well the network generalizes. 
-\end{itemize}
+Within these parameters, the network seems to rapidly improve it's performance on the test graphs and reaching a plateau where it remains for the remainder of the training time.
+
+\includegraphics[scale=0.5]{../ER_20spin/eco/min_cover/network/loss.png}
+
+\includegraphics[scale=0.5]{../ER_20spin/eco/min_cover/network/training_curve.png}
+
+\textbf{Still need to run actual tests, this is only training results, which are promising but not conclusive.}
 
 \subsection{Generalization}
 
 \textbf{Just some footnotes/brainstorming for now}
 
-To generalize these ideas to any problem, some framework needs to be solidified for choosing observations and rewards. Something related to the constraints of the problem (if any) would need to be specified. For Minimum Vertex Cover there's a simple way of doing this as described in this section, but extending this to other problems is much more difficult. Further, there's no real way that I know of that could actually confirm whether other frameworks for learning would actually yield good results other than manually verifying it by creating the observations and reward mechanism then training a network (obviously bad and not very useful).
+To generalize these ideas to any problem, some framework needs to be solidified for choosing observations and rewards. Something related to the constraints of the problem (if any) would need to be specified. For Minimum Vertex Cover there's a simple way of doing this as described in it's section, but extending this to other problems is more difficult. Further, there's no real way that I know of that could actually confirm whether other frameworks for learning would actually yield good results other than manually verifying it by creating the observations and reward mechanism then training a network (obviously bad and not very useful).
 
-If the framework I thought of for MVC works as well as the different framework for MaxCut did, I'd say there's at least some merit to the general structure and idea of ECO-DQN and the idea of encoding some reward and even extra observations to encode validity constraints. It's a matter of formulating observations and rewards so they can encode not only the actual problem constraint (i.e. cut size for max cut or minimum bisection, vertex cover size for minimum vertex cover, path length for traveling salesman), but also some sort of validity constraint (reward to determine whether a candidate is a valid solution) that can generalize to different problems (i.e. size of partition for minimum bisection, whether a cover actually reaches every edge for minimum vertex cover, whether a path is a full tour for traveling salesman).
-
-Many of the constraints would likely need to be formulated such that they change depending on whether the problem is maximization or minimization. For example, choosing $max(0, cover(S) - cover(S^*))$ for MVC only makes sense because you're trying to maximize the number of edges covered. When $S^*$ is a valid candidate, this term will always be 0. If you're instead trying to minimize something, the terms would have to be swapped. For example, in the minimum bisection, you'd want to minimize the absolute difference betweeen the size of the partitions of the graph. Therefore, the idea for that problem would be more like $max(0$, partdiff$(S^*) - $partdiff$(S))$ for a new candidate. Note that taking the absolute difference doesn't work because we actually want negative values to exist to reach 0.
-
-Definitely problems arise if the decision isn't binary, adding or removing a vertex from a single solution set, like with Minimum K-Cut.
+Definitely problems arise if the decision isn't binary, adding or removing a vertex from a single solution set, like with Minimum K-Cut. For a problem like the Traveling Salesman Problem, there's the issue that the solution isn't just splitting the graph into two sets, but is instead an ordered list. 
 
 \bibliography{main}
 \bibliographystyle{ieeetr}
