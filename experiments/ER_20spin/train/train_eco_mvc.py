@@ -64,6 +64,10 @@ def run(save_loc="ER_20spin/eco/min_cover"):
     graphs_test = load_graph_set(graph_save_loc)
     n_tests = len(graphs_test)
 
+    # For MVC, we want uniform edges... instead of generating new graphs, take the discrete test graphs and make them uniform
+    for i in range(len(graphs_test)):
+       graphs_test[i] = np.array(graphs_test[i] != 0, dtype=np.float64)
+
     test_graph_generator = SetGraphGenerator(graphs_test, ordered=True)
 
     ####################################################
