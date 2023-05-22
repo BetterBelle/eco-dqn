@@ -57,14 +57,23 @@ class SpinSystemBase():
     # Note these are defined at the class level of SpinSystem to ensure that SpinSystem
     # can be pickled.
     class action_space():
+        """
+        The action space for a SpinSystem. This determines the number of actions and actions that can be done on the system.
+        """
         def __init__(self, n_actions):
             self.n = n_actions
             self.actions = np.arange(self.n)
 
         def sample(self, n=1):
+            """
+            Chooses a random action from the action space
+            """
             return np.random.choice(self.actions, n)
 
     class observation_space():
+        """
+        Represents the space of observations for the SpinSystem. This gives the number of vertices and observables in the system.
+        """
         def __init__(self, n_spins, n_observables):
             self.shape = [n_spins, n_observables]
 
@@ -230,7 +239,6 @@ class SpinSystemBase():
             self.spins_memory = np.array([self.best_spins] * self.memory_length)
             self.idx_memory = 1
 
-        ### Reset graph observables, not really sure what matrix_obs or self.matrix are at the moment
         self._reset_graph_observables()
 
         ### Keeps track of rewards for local minimums and punishments for stagnation
@@ -544,8 +552,8 @@ class SpinSystemBase():
 
     def get_allowed_action_states(self):
         """
-        Gets the allowed actions, either (0, 1) or (1, -1).
-        For irreversible ones it's only 0 or 1. Note that for binary basis (0, 1), 1 is considered the default state and -1 is considered
+        Gets the allowed action states, either (0, 1) or (1, -1). That is, the states that can be changed (not the result).
+        For irreversible ones it's only 0 or 1. Note that for binary basis (0, 1), 0 is considered the default state and -1 is considered
         the default state for signed basis. 
         """
         if self.reversible_spins:
@@ -562,6 +570,9 @@ class SpinSystemBase():
                 return -1
 
     def _format_spins_to_signed(self, spins):
+        """
+        Formats the spins to signed basis, i.e. -1 out, 1 in the candidate solution state
+        """
         if self.spin_basis == SpinBasis.BINARY:
             if not np.isin(spins, [0, 1]).all():
                 raise Exception("SpinSystem is configured for binary spins ([0,1]).")
