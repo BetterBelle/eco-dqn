@@ -34,9 +34,9 @@ class SpinSolver(ABC):
 
         self.total_reward = 0
 
-    def reset(self):
+    def reset(self, spins = None):
         self.total_reward = 0
-        self.env.reset()
+        self.env.reset(spins)
 
     def solve(self, *args):
         """Solve the SpinSystem by flipping individual spins until termination.
@@ -92,10 +92,6 @@ class Greedy(SpinSolver):
         """
 
         super().__init__(*args, **kwargs)
-
-    def reset(self, spins = None):
-        super().reset()
-        self.env.reset(spins)
 
     def step(self):
         """Take the action which maximises the immediate reward.
@@ -179,10 +175,7 @@ class Network(SpinSolver):
         self.history = []
 
     def reset(self, spins=None, clear_history=True):
-        if spins is None:
-            self.current_observation = self.env.reset()
-        else:
-            self.current_observation = self.env.reset(spins)
+        self.current_observation = self.env.reset(spins)
         self.current_observation = torch.FloatTensor(self.current_observation).to(self.device)
         self.total_reward = 0
 
@@ -242,14 +235,11 @@ class CoverMatching(SpinSolver):
     def __init__(self, env: SpinSystemBase, record_cut=False, record_rewards=False, record_qs=False, verbose=False):
         super().__init__(env, record_cut, record_rewards, record_qs, verbose)
 
-    def reset(self):
+    def reset(self, spins=None):
         """
-        Reset the environment to an empty solution
+        Reset with an empty solution
         """
-        super().reset()
-        ### Cover matching always starts with an empty solution
-        self.total_reward = 0
-        self.env.reset([-1] * self.env.n_spins)
+        super().reset([-1] * self.env.n_spins)
 
     def step(self):
         rew = 0 ### Because the solve function needs this
@@ -283,11 +273,11 @@ class CplexSolver(SpinSolver):
         super().__init__(env, record_cut, record_rewards, record_qs, verbose)
         self._solver = cplex.Cplex()
 
-    def reset(self):
+    def reset(self, spins=None):
         """
-        Reset the environment to an empty solution and prepare the solver
+        Reset the environment and prepare the solver
         """
-        super().reset()
+        super().reset(spins)
         ### Generate the problem parameters
         if self.env.optimisation_target == OptimisationTarget.MIN_COVER:
             self._solver.set_problem_name("Minimum Vertex Cover")
@@ -342,7 +332,7 @@ class NetworkXMinCoverSolver(SpinSolver):
 
     def reset(self):
         """
-        Reset the environment to empty
+        Reset the environment and prepare the solver/solution
         """
         super().reset()
         self.env.reset([-1] * self.env.n_spins)
@@ -356,6 +346,9 @@ class NetworkXMinCoverSolver(SpinSolver):
         rew = 0
         action = self._solution[self._current_index]
         observation, reward, done, _ = self.env.step(action)
+
+        rew += reward
+        
         self._current_index += 1
         if self._current_index == len(self._solution):
             done = True
