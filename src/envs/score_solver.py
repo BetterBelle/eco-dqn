@@ -157,7 +157,7 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         """
         Gets the number of uncovered edges by the spins in the solution on the matrix
         """
-        # np.array([spins == -1) gives an array with 0s where there are nodes in the solution. Multiplying
+        # np.array([spins == -1]) gives an array with 0s where there are nodes in the solution. Multiplying this and it's transpose
         # by the matrix gives the matrix with only uncovered edges (counted twice, as it'll be bi-directional due to undirected graph)
         # therefore sum and divide by two to get number of uncovered edges
         

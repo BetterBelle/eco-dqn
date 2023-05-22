@@ -11,6 +11,7 @@ from collections import namedtuple
 from copy import deepcopy
 
 import src.envs.core as ising_env
+import src.envs.spinsystem as spinsystem
 from src.envs.utils import (SingleGraphGenerator, SpinBasis)
 from src.agents.solver import Network, Greedy
 
@@ -51,7 +52,7 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
         if env_args['spin_basis'] == SpinBasis.BINARY:
             allowed_action_state = 0
         if env_args['spin_basis'] == SpinBasis.SIGNED:
-            allowed_action_state = 1
+            allowed_action_state = -1
 
     def predict(states):
 
@@ -96,15 +97,15 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
                                   n_steps,
                                   **env_args)
 
-        print("Running greedy solver with +1 initialisation of spins...", end="...")
-        # Calculate the greedy cut with all spins initialised to +1
+        print("Running greedy solver with -1 initialisation of spins...", end="...")
+        # Calculate the greedy cut with all spins initialised to -1
         greedy_env = deepcopy(test_env)
-        greedy_env.reset(spins=np.array([1] * test_graph.shape[0]))
+        greedy_env.reset(spins=np.array([-1] * test_graph.shape[0]))
 
         greedy_agent = Greedy(greedy_env)
         greedy_agent.solve()
 
-        greedy_single_cut = greedy_env.get_best_cut()
+        greedy_single_cut = greedy_env.best_solution
         greedy_single_spins = greedy_env.best_spins
 
         print("done.")
@@ -114,7 +115,7 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
             rewards_history = []
             scores_history = []
 
-        best_cuts = []
+        best_solutions = []
         init_spins = []
         best_spins = []
 
@@ -135,12 +136,12 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
                 rewards_history_batch = [[None] * batch_size]
                 scores_history_batch = []
 
-            test_envs = [None] * batch_size
-            best_cuts_batch = [-1e3] * batch_size
+            test_envs : list[spinsystem.SpinSystemBase] = [None] * batch_size
+            best_solutions_batch = [-1e3] * batch_size
             init_spins_batch = [[] for _ in range(batch_size)]
             best_spins_batch = [[] for _ in range(batch_size)]
 
-            greedy_envs = [None] * batch_size
+            greedy_envs : list[spinsystem.SpinSystemBase] = [None] * batch_size
             greedy_cuts_batch = []
             greedy_spins_batch = []
 
@@ -155,7 +156,7 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
                 greedy_envs[i] = deepcopy(env)
                 init_spins_batch[i] = env.best_spins
             if return_history:
-                scores_history_batch.append([env.calculate_score() for env in test_envs])
+                scores_history_batch.append([env.scorer.get_score(env.state[0, :env.n_spins], env.matrix) for env in test_envs])
 
             print("done.")
 
@@ -186,13 +187,13 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
                         obs, rew, done, info = env.step(action)
 
                         if return_history:
-                            scores.append(env.calculate_score())
+                            scores.append(env.scorer.get_score(env.state[0, :env.n_spins], env.matrix))
                             rewards.append(rew)
 
                         if not done:
                             obs_batch.append(obs)
                         else:
-                            best_cuts_batch[i] = env.get_best_cut()
+                            best_solutions_batch[i] = env.scorer.get_solution(env.state[0, :env.n_spins], env.matrix)
                             best_spins_batch[i] = env.best_spins
                             i_comp_batch += 1
                             i_comp += 1
@@ -219,7 +220,7 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
 
                 for env in greedy_envs:
                     Greedy(env).solve()
-                    cut = env.get_best_cut()
+                    cut = env.best_solution
                     greedy_cuts_batch.append(cut)
                     greedy_spins_batch.append(env.best_spins)
 
@@ -230,7 +231,7 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
                 rewards_history += rewards_history_batch
                 scores_history += scores_history_batch
 
-            best_cuts += best_cuts_batch
+            best_solutions += best_solutions_batch
             init_spins += init_spins_batch
             best_spins += best_spins_batch
 
@@ -242,11 +243,11 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
             # print("\tGraph {}, par. steps: {}, comp: {}/{}".format(j, k, i_comp, batch_size),
             #       end="\r" if n_spins<100 else "")
 
-        i_best = np.argmax(best_cuts)
-        best_cut = best_cuts[i_best]
+        i_best = np.argmax(best_solutions)
+        best_cut = best_solutions[i_best]
         sol = best_spins[i_best]
 
-        mean_cut = np.mean(best_cuts)
+        mean_cut = np.mean(best_solutions)
 
         if env_args["reversible_spins"]:
             idx_best_greedy = np.argmax(greedy_cuts)
@@ -269,7 +270,7 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
                         t_total/(n_attempts)])
 
         results_raw.append([init_spins,
-                            best_cuts, best_spins,
+                            best_solutions, best_spins,
                             greedy_cuts, greedy_spins])
 
         if return_history:
