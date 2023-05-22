@@ -264,7 +264,7 @@ class SpinSystemBase():
     def _reset_state(self, spins=None):
         """
         The state's immediate reward and greedy actions get reset based on current spins selected
-        Note that for unreversible spins (i.e. S2V) all spins are set to 1 and can be flipped to -1 but for reversibles
+        Note that for unreversible spins (i.e. S2V) all spins are set to -1 and can be flipped to 1 but for reversibles
         the spins get set to a random value either 1 or -1. If a spin list is passed in, we format them to be signed.
         """
         state = np.zeros((self.observation_space.shape[1], self.n_actions))
