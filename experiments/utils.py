@@ -193,7 +193,7 @@ def __test_network_batched(network, env_args, graphs_test, device=None, step_fac
                         if not done:
                             obs_batch.append(obs)
                         else:
-                            best_solutions_batch[i] = env.scorer.get_solution(env.state[0, :env.n_spins], env.matrix)
+                            best_solutions_batch[i] = env.best_solution
                             best_spins_batch[i] = env.best_spins
                             i_comp_batch += 1
                             i_comp += 1
