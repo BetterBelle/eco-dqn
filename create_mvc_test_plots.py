@@ -10,14 +10,14 @@ algorithms = ["CPLEX",
               "Greedy Empty Start", 
               "Greedy Random Start", 
               "NetworkX Min Weighted Cover",
-              "Neural Network ER |V|=20, Empty Start",
-              "Neural Network ER |V|=20, Full Start",
-              "Neural Network ER |V|=20, Random Start"]
+              "Neural Network ER |V|=40, Empty Start",
+              "Neural Network ER |V|=40, Full Start",
+              "Neural Network ER |V|=40, Random Start"]
 
 ind = np.arange(len(x))
 width = 0.12
 
-with open('test_data.txt') as f:
+with open('test_data40.txt') as f:
     solution_data = eval(f.read())
 
 bars = []
@@ -33,7 +33,7 @@ for i in range(len(solution_data)):
 
 plt.xlabel("Validation Graph Size")
 plt.ylabel("Mean Cover Size")
-plt.title("Mean Cover Size by Algorithm on Validation Graphs (Erdős–Rényi; p=0.15)")
+plt.title("Mean Cover Size by Algorithm on Validation Graphs (Erdős-Rényi; p=0.15)")
 plt.xticks(ind + width * len(solution_data) / 2, x)
 plt.legend(tuple(bars), tuple(algorithms))
-plt.savefig('test.png')
+plt.savefig('test40.png')
