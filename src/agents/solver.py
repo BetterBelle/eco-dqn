@@ -109,7 +109,7 @@ class Greedy(SpinSolver):
             masked_rewards_avaialable = rewards_available.copy()
             np.putmask(masked_rewards_avaialable,
                        self.env.get_observation()[0, :] != self.env.get_allowed_action_states(),
-                       -100)
+                       np.finfo(np.float64).min)
             action = masked_rewards_avaialable.argmax()
 
         if rewards_available[action] < 0:
@@ -318,7 +318,7 @@ class CplexSolver(SpinSolver):
         print("Solving {} as a {} with cplex on graph {}".format(self._solver.get_problem_name(), self._solver.get_problem_type(), self.env))
         self._solver.solve()
         print("Solution result is {}".format(self._solver.solution.get_status_string()))
-        self.env.reset(2 * np.array(self._solver.solution.get_values()) - 1)
+        self.env.reset(2 * np.array(self._solver.solution.get_values(), dtype=np.int64) - 1)
 
     def step(self, *args):
         """
@@ -348,7 +348,7 @@ class NetworkXMinCoverSolver(SpinSolver):
         observation, reward, done, _ = self.env.step(action)
 
         rew += reward
-        
+
         self._current_index += 1
         if self._current_index == len(self._solution):
             done = True
