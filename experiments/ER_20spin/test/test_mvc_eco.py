@@ -31,6 +31,11 @@ def run(save_loc="ER_20spin/eco/min_cover",
     print("\n----- Running {} -----\n".format(os.path.basename(__file__)))
 
     graphs_40_loc = "_graphs/validation/ER_40spin_p15_100graphs.pkl"
+    graphs_60_loc = "_graphs/validation/ER_60spin_p15_100graphs.pkl"
+    graphs_80_loc = "_graphs/validation/ER_80spin_p15_100graphs.pkl"
+    graphs_100_loc = "_graphs/validation/ER_100spin_p15_100graphs.pkl"
+    graphs_200_loc = "_graphs/validation/ER_200spin_p15_100graphs.pkl"
+    graphs_500_loc = "_graphs/validation/ER_500spin_p15_100graphs.pkl"
 
     ####################################################
     # NETWORK LOCATION
@@ -80,24 +85,26 @@ def run(save_loc="ER_20spin/eco/min_cover",
     # LOAD VALIDATION GRAPHS
     ####################################################
 
-    graphs_test = load_graph_set(graph_save_loc)
-    graphs_40_test = load_graph_set(graphs_40_loc)
+    all_graphs = [load_graph_set(graph_save_loc), 
+                  load_graph_set(graphs_40_loc),
+                  load_graph_set(graphs_60_loc),
+                  load_graph_set(graphs_80_loc),
+                  load_graph_set(graphs_100_loc),]
+    vert_counts = [20, 40, 60, 80, 100]
 
     ### CONVERT GRAPHS TO UNIFORM
-    for i in range(len(graphs_test)):
-        graphs_test[i] = np.array(graphs_test[i] != 0, dtype=np.float64)
-
-    for i in range(len(graphs_40_test)):
-        graphs_40_test[i] = np.array(graphs_40_test[i] != 0, dtype=np.float64)
-
-
+    for diff_vert_count in all_graphs:
+        for i in range(len(diff_vert_count)):
+            diff_vert_count[i] = np.array(diff_vert_count[i] != 0, dtype=np.float64)
+    
+    
     ####################################################
     # SETUP NETWORK TO TEST
     ####################################################
 
     test_env = ising_env.make("SpinSystem",
-                              SingleGraphGenerator(graphs_test[0]),
-                              graphs_test[0].shape[0]*step_factor,
+                              SingleGraphGenerator(all_graphs[0][0]),
+                              all_graphs[0][0].shape[0]*step_factor,
                               **env_args)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -113,8 +120,6 @@ def run(save_loc="ER_20spin/eco/min_cover",
     network.eval()
 
     print("Sucessfully created agent with pre-trained MPNN.\nMPNN architecture\n\n{}".format(repr(network)))
-
-    all_graphs = [graphs_test, graphs_40_test]
 
     batch_size = 50
     cplex_solutions = []
@@ -156,7 +161,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
             
             # Create the environments that the solvers will run on
             # For solvers that only need to be tested once, just use the first environment
-            print("Preparing batch of {} environments for graph {}.".format(batch_size,j), end="...")
+            print("Preparing batch of {} environments for graph {} with |V| = {}...".format(batch_size,j,test_graph.shape[0]))
             for i in range(batch_size):
                 test_envs[i] = ising_env.make("SpinSystem",
                                             SingleGraphGenerator(test_graph),
@@ -170,6 +175,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
             cplex_batch.append(test_envs[0].scorer.get_solution(test_envs[0].state[0, :test_envs[0].n_spins], test_envs[0].matrix))
 
             # Next test cover matching (run 50 tests on each graph)
+            print("Running Matching Algorithm")
             matching_solutions_batch = []
             for i in range(batch_size):
                 matching_solver = CoverMatching(env=test_envs[i])
@@ -179,7 +185,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
 
             cover_matching_batch.append(matching_solutions_batch)
 
-
+            print("Running Greedy Algorithm from empty state")
             # Next test greedy allowing reversal from start state
             greedy_solver = Greedy(env=test_envs[0])
             greedy_solver.reset()
@@ -187,6 +193,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
             greedy_start_batch.append(test_envs[0].best_solution)
 
             # Next test greedy allowing reversal from random state (run 50 tests on each graph)
+            print("Running Greedy Algorithm from random state")
             greedy_random_sub_batch = []
             for i in range(batch_size):
                 greedy_solver = Greedy(env=test_envs[i])
@@ -196,6 +203,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
 
             greedy_random_batch.append(greedy_random_sub_batch)
 
+            print("Running NetworkX min_weighted_cover algorithm")
             # Next test networkx minimum weighted cover
             networkx_solver = NetworkXMinCoverSolver(env=test_envs[0])
             networkx_solver.reset()
@@ -204,6 +212,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
 
             # Next test network from empty state
             # First reset the environment to be empty, getting the observations
+            print("Running GECO on empty initial state.")
             obs_batch = test_envs[0].reset([-1] * test_envs[0].n_spins)
             done = False
             while not done:
@@ -216,6 +225,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
             neural_network_empty_start_batch.append(test_envs[0].best_solution)
 
             # Next test network from full state
+            print("Running GECO on full initial state")
             obs_batch = test_envs[0].reset([1] * test_envs[0].n_spins)
             done = False
             while not done:
@@ -228,6 +238,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
             neural_network_full_start_batch.append(test_envs[0].best_solution)
             
             # Next test network from random state (run 50 tests on each graph)
+            print("Running GECO on random inital state.")
             obs_batch = []
             done = False
             # Reset all the environments
@@ -266,18 +277,19 @@ def run(save_loc="ER_20spin/eco/min_cover",
     neural_network_full_start_solutions = []
     neural_network_random_solutions = []
     """
+
     cover_matching_solutions_avg = []
     greedy_random_solutions_avg = []
     neural_network_random_solutions_avg = []
 
     # For every randomized algorithm, whether through start state or implementation, reduce each to the average of the batched solutions
-    for i in range(2):
-        for j in range(len(graphs_test)):
+    for i in range(len(all_graphs)):
+        for j in range(len(all_graphs[i])):
             cover_matching_solutions_avg.append(np.average(cover_matching_solutions[i][j]))
             greedy_random_solutions_avg.append(np.average(greedy_random_solutions[i][j]))
             neural_network_random_solutions_avg.append(np.average(neural_network_random_solutions[i][j]))
 
-    x = ["Graphs of size {}".format(i) for i in [20, 40]]
+    x = ["|V| = {}".format(i) for i in vert_counts]
     algorithms = ["CPLEX", 
                   "MaxMatching", 
                   "Greedy Empty Start", 
@@ -288,7 +300,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
                   "Neural Network, Random Start"]
     
     ind = np.arange(len(x))
-    width = 0.1
+    width = 0.12
 
     solution_data = [[np.average(x) for x in cplex_solutions], 
                      [np.average(x) for x in cover_matching_solutions], 
@@ -299,15 +311,19 @@ def run(save_loc="ER_20spin/eco/min_cover",
                      [np.average(x) for x in neural_network_full_start_solutions],
                      [np.average(x) for x in neural_network_random_solutions]]
     
+    # Print this data to file in case the graphs are messed up
+    with open("test_data.txt", 'w') as f:
+        f.write(str(solution_data))
+    
     
     bars = []
 
     for i, data in enumerate(solution_data):
-        bars.append(plt.bar(ind + width * i, data, width, ha = 'center'))
+        bars.append(plt.bar(ind + width * i, data, width))
 
-    for i in range(len(x)):
+    for i in range(len(solution_data)):
         for j in range(len(solution_data[i])):
-            plt.text(i + j * width, solution_data[i][j], solution_data[i][j])
+            plt.text(j + i * width, solution_data[i][j], round(solution_data[i][j], 2), ha='center')
     
     plt.xlabel("Validation Graph Size")
     plt.ylabel("Average Cover Size")
@@ -339,7 +355,7 @@ def predict(network, states, acting_in_reversible_spin_env, allowed_action_state
             actions = [x[qs[x].argmax().item()].item()]
         else:
             disallowed_actions_mask = (states[:, :, 0] != allowed_action_state)
-            qs_allowed = qs.masked_fill(disallowed_actions_mask, -1000)
+            qs_allowed = qs.masked_fill(disallowed_actions_mask, np.finfo(np.float64).min)
             actions = qs_allowed.argmax(1, True).squeeze(1).cpu().numpy()
         return actions
 
