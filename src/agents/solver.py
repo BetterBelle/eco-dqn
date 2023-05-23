@@ -272,6 +272,8 @@ class CplexSolver(SpinSolver):
     def __init__(self, env: SpinSystemBase, record_cut=False, record_rewards=False, record_qs=False, verbose=False):
         super().__init__(env, record_cut, record_rewards, record_qs, verbose)
         self._solver = cplex.Cplex()
+        self._solver.set_log_stream(None)
+        self._solver.set_results_stream(None)
 
     def reset(self, spins=None):
         """
@@ -315,9 +317,8 @@ class CplexSolver(SpinSolver):
                                                  rhs=rhs)
 
     def solve(self):
-        print("Solving {} as a {} with cplex on graph {}".format(self._solver.get_problem_name(), self._solver.get_problem_type(), self.env))
         self._solver.solve()
-        print("Solution result is {}".format(self._solver.solution.get_status_string()))
+        print("CPLEX solution result is {}".format(self._solver.solution.get_status_string()))
         self.env.reset(2 * np.array(self._solver.solution.get_values(), dtype=np.int64) - 1)
 
     def step(self, *args):
