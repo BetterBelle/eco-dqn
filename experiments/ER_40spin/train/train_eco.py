@@ -149,7 +149,7 @@ def run(save_loc="ER_40spin/eco"):
                 test_episodes=n_tests,
                 test_frequency=10000,  # 10000
                 test_save_path=test_save_path,
-                test_metric=TestMetric.MAX_CUT,
+                test_metric=TestMetric.BEST,
 
                 seed=None
                 )

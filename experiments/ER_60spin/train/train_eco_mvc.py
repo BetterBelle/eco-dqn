@@ -4,6 +4,9 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 
+import sys
+sys.path.insert(0, '/home/cloudan/Documents/School/Project/eco-dqn')
+
 import src.envs.core as ising_env
 from experiments.utils import load_graph_set, mk_dir
 from src.agents.dqn.dqn import DQN
@@ -12,7 +15,7 @@ from src.envs.utils import (SetGraphGenerator,
                             RandomErdosRenyiGraphGenerator,
                             EdgeType, RewardSignal, ExtraAction,
                             OptimisationTarget, SpinBasis,
-                            DEFAULT_OBSERVABLES)
+                            MVC_OBSERVABLES)
 from src.networks.mpnn import MPNN
 
 try:
@@ -23,7 +26,7 @@ except ImportError:
 
 import time
 
-def run(save_loc="ER_60spin/eco"):
+def run(save_loc="ER_60spin/eco/min_cover"):
 
     print("\n----- Running {} -----\n".format(os.path.basename(__file__)))
 
@@ -34,11 +37,11 @@ def run(save_loc="ER_60spin/eco"):
     gamma=0.95
     step_fact = 2
 
-    env_args = {'observables':DEFAULT_OBSERVABLES,
+    env_args = {'observables':MVC_OBSERVABLES,
                 'reward_signal':RewardSignal.BLS,
                 'extra_action':ExtraAction.NONE,
-                'optimisation_target':OptimisationTarget.CUT,
-                'spin_basis':SpinBasis.BINARY,
+                'optimisation_target':OptimisationTarget.MIN_COVER,
+                'spin_basis':SpinBasis.SIGNED,
                 'norm_rewards':True,
                 'memory_length':None,
                 'horizon_length':None,
@@ -52,7 +55,7 @@ def run(save_loc="ER_60spin/eco"):
 
     n_spins_train = 60
 
-    train_graph_generator = RandomErdosRenyiGraphGenerator(n_spins=n_spins_train,p_connection=0.15,edge_type=EdgeType.DISCRETE)
+    train_graph_generator = RandomErdosRenyiGraphGenerator(n_spins=n_spins_train,p_connection=0.15,edge_type=EdgeType.UNIFORM)
 
     ####
     # Pre-generated test graphs
@@ -60,6 +63,10 @@ def run(save_loc="ER_60spin/eco"):
     graph_save_loc = "_graphs/testing/ER_60spin_p15_50graphs.pkl"
     graphs_test = load_graph_set(graph_save_loc)
     n_tests = len(graphs_test)
+
+    # For MVC, we want uniform edges... instead of generating new graphs, take the discrete test graphs and make them uniform
+    for i in range(len(graphs_test)):
+       graphs_test[i] = np.array(graphs_test[i] != 0, dtype=np.float64)
 
     test_graph_generator = SetGraphGenerator(graphs_test, ordered=True)
 
@@ -88,10 +95,11 @@ def run(save_loc="ER_60spin/eco"):
 
     mk_dir(data_folder)
     mk_dir(network_folder)
-    # print(data_folder)
+    
     network_save_path = os.path.join(network_folder,'network.pth')
     test_save_path = os.path.join(network_folder,'test_scores.pkl')
     loss_save_path = os.path.join(network_folder, 'losses.pkl')
+    solutions_save_path = os.path.join(network_folder, 'solution.pkl')
 
     ####################################################
     # SET UP AGENT
@@ -141,7 +149,7 @@ def run(save_loc="ER_60spin/eco"):
                 logging=False,
                 loss="mse",
 
-                save_network_frequency=200000,
+                save_network_frequency=100000,
                 network_save_path=network_save_path,
 
                 evaluate=True,
@@ -165,28 +173,46 @@ def run(save_loc="ER_60spin/eco"):
 
     agent.save()
 
-
     ############
-    # PLOT - learning curve
+    # PLOT - solution curve
     ############
-    data = pickle.load(open(test_save_path,'rb'))
+    data = pickle.load(open(solutions_save_path,'rb'))
     data = np.array(data)
 
     fig_fname = os.path.join(network_folder,"training_curve")
 
     plt.plot(data[:,0],data[:,1])
     plt.xlabel("Timestep")
-    plt.ylabel("Mean reward")
+    plt.ylabel("Mean Solution Quality")
+    if agent.test_metric == TestMetric.FINAL:
+       plt.ylabel("Mean final solution")
     if agent.test_metric==TestMetric.ENERGY_ERROR:
       plt.ylabel("Energy Error")
-    elif agent.test_metric==TestMetric.BEST_ENERGY:
-      plt.ylabel("Best Energy")
     elif agent.test_metric==TestMetric.CUMULATIVE_REWARD:
       plt.ylabel("Cumulative Reward")
-    elif agent.test_metric==TestMetric.MAX_CUT:
-      plt.ylabel("Max Cut")
-    elif agent.test_metric==TestMetric.FINAL_CUT:
-      plt.ylabel("Final Cut")
+
+    plt.savefig(fig_fname + ".png", bbox_inches='tight')
+    plt.savefig(fig_fname + ".pdf", bbox_inches='tight')
+
+    plt.clf()
+
+    ############
+    # PLOT - score curve
+    ############
+    data = pickle.load(open(test_save_path,'rb'))
+    data = np.array(data)
+
+    fig_fname = os.path.join(network_folder,"score_curve")
+
+    plt.plot(data[:,0],data[:,1])
+    plt.xlabel("Timestep")
+    plt.ylabel("Mean score")
+    if agent.test_metric == TestMetric.FINAL:
+       plt.ylabel("Mean final score")
+    if agent.test_metric==TestMetric.ENERGY_ERROR:
+      plt.ylabel("Energy Error")
+    elif agent.test_metric==TestMetric.CUMULATIVE_REWARD:
+      plt.ylabel("Cumulative Reward")
 
     plt.savefig(fig_fname + ".png", bbox_inches='tight')
     plt.savefig(fig_fname + ".pdf", bbox_inches='tight')
@@ -214,8 +240,6 @@ def run(save_loc="ER_60spin/eco"):
 
     plt.savefig(fig_fname + ".png", bbox_inches='tight')
     plt.savefig(fig_fname + ".pdf", bbox_inches='tight')
-
-    plt.clf()
 
 if __name__ == "__main__":
     run()
