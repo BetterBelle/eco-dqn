@@ -23,7 +23,7 @@ try:
 except ImportError:
     pass
 
-def run(save_loc="ER_20spin/eco/min_cover",
+def run(save_loc="ER_200spin/eco/min_cover",
         graph_save_loc="_graphs/validation/ER_20spin_p15_100graphs.pkl",
         batched=True,
         max_batch_size=None):
@@ -78,7 +78,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
                 'memory_length': None,
                 'horizon_length': None,
                 'stag_punishment': None,
-                'basin_reward': 1. / 20,
+                'basin_reward': 1. / 200,
                 'reversible_spins': True}
 
     ####################################################
@@ -289,19 +289,6 @@ def run(save_loc="ER_20spin/eco/min_cover",
             greedy_random_solutions_avg.append(np.average(greedy_random_solutions[i][j]))
             neural_network_random_solutions_avg.append(np.average(neural_network_random_solutions[i][j]))
 
-    x = ["|V| = {}".format(i) for i in vert_counts]
-    algorithms = ["CPLEX", 
-                  "MaxMatching", 
-                  "Greedy Empty Start", 
-                  "Greedy Random Start", 
-                  "NetworkX Min Weighted Cover",
-                  "Neural Network, Empty Start",
-                  "Neural Network, Full Start",
-                  "Neural Network, Random Start"]
-    
-    ind = np.arange(len(x))
-    width = 0.12
-
     solution_data = [[np.average(x) for x in cplex_solutions], 
                      [np.average(x) for x in cover_matching_solutions], 
                      [np.average(x) for x in greedy_start_solutions],
@@ -312,7 +299,7 @@ def run(save_loc="ER_20spin/eco/min_cover",
                      [np.average(x) for x in neural_network_random_solutions]]
     
     # Print this data to file in case the graphs are messed up
-    with open("test_data20.txt", 'w') as f:
+    with open("test_data200.txt", 'w') as f:
         f.write(str(solution_data))
 
 
