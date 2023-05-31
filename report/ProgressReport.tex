@@ -170,7 +170,7 @@ The code includes most, but not all, of the tests ran in the paper. Some of the 
 
 \subsection{Running Code}
 
-They very generously provide a README file that specifies the exact commands to run in order to train, test and validate networks. These simply run specific files, namely the test_eco.py, train_eco.py and train_and_test_eco.py files, for the respective graph sizes, so they can also be run by doing the typical process for running a python file. However, there is no code for reproducing the specific tables and plots. The data saved that is capable of generating the tables and plots in the paper are saved in (ER|BA)##spin/eco/(problem_type)/data and therefore could be used to generate those plots and tables and the code for generating that data is provided and can therefore be analyzed and used for different problems, as different algorithms would have to be used for comparison.
+They very generously provide a README file that specifies the exact commands to run in order to train, test and validate networks. These simply run specific files, namely the test\_eco.py and train\_eco.py files, for the respective graph sizes, so they can also be run by doing the typical process for running a python file. However, there is no code for reproducing the specific tables and plots. The data saved that is capable of generating the tables and plots in the paper are saved and therefore could be used to generate them. The code for generating that data is also provided and can therefore be analyzed and used for different problems, as different algorithms would have to be used for comparison.
 
 \subsection{Graph Generation}
 
@@ -186,11 +186,16 @@ Just as with the original idea for ECO-DQN, at each step the best found solution
 
 \subsection{Results}
 
-The result of training this network is very similar to the maximum cut found in the ECO-DQN paper. It starts giving random solutions and eventually reaches a point where the cut value found stabilizes on the test graphs. This demonstrates that the network structure can be utilized to solve other problems. This was not tested against other algorithms, so it is possible that the cuts found are not minimal, but this provides some indication that at least the network can learn something about other problems than the Maximum Cut Problem.
+The result of training found in Figure \ref{fig:min-cut-training} show this network is very similar to the maximum cut found in the ECO-DQN paper. It starts giving random solutions and eventually reaches a point where the cut value found stabilizes on the test graphs. This demonstrates that the network structure can be utilized to solve other problems. This was not tested against other algorithms, so it is possible that the cuts found are not minimal, but this provides some indication that at least the network can learn something about other problems than the Maximum Cut Problem. 
 
-\includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/loss.png}
+\begin{figure}[ht]
+    \caption{Loss and Average Cut Found on Validation Graphs During Training, $|V|=20$}
+    \centering
+    \includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/loss.png}
 
-\includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/training_curve.png}
+    \includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/training_curve.png}
+    \label{fig:min-cut-training}
+\end{figure}
 
 \section{Minimum Vertex Cover}
 
@@ -269,7 +274,7 @@ $score(S) = validity(S) * |V / S| - edges\_uncovered(S)$.
 
 Where $S$ is the current candidate solution state being evaluated. Normalizing this score would be similar,
 
-$norm_score(S) = validity(S) * |V / S| / |V| - edges\_uncovered(S) / |E|$. 
+$norm\_score(S) = validity(S) * |V / S| / |V| - edges\_uncovered(S) / |E|$. 
 
 To elaborate on the previous point mentioned in the Observations section of the Minimum Vertex Cover, this means that when starting from the empty candidate solution, the largest possible change in score would be difference between the score for $|V / S| = |V|$ and the score for an invalid solution, maximizing the number of edges uncovered such that when a vertex is added, the solution is now valid. This would be like adding the vertex of highest degree to the current candidate, resulting in the empty solution, while also being a valid solution. 
 
@@ -288,44 +293,79 @@ As with ECO-DQN, we will also give intermediate rewards for finding new local op
 
 Training this network will be algorithmically identical to ECO-DQN \cite{eco-dqn} using the ideas from Deep Q-Learning described in \textit{Mnih et al.} \cite{deepmind_2015}.
 
-\subsection{Results and Implementation Details}
-
 Because the original test graphs were generated using discrete edges weights of either $1$ or $-1$, we first recreate the test graphs with the same edges but setting all the weights to $1$. This functions as an undirected, unweighted graph for evaluating a Minimum Vertex Cover. All of the training graphs will also be generated using uniform weights, on ER graphs with edge probability of $0.15$. Training and testing graphs will have the same number of vertices.
 
-Within these parameters for training and testing graphs with $|V| = 20$, the network seems to rapidly improve it is performance on the test graphs and reaching a plateau where it remains for the remainder of the training time.
+Within these parameters for training and testing graphs with $|V| = 20$, the network seems to rapidly improve it is performance on the test graphs and reaching a plateau where it remains for the remainder of the training time. This same trend is observed for larger training graphs. Figures \ref{fig:training-mvc-20} and \ref{fig:training-mvc-60} show the training loss and average solution found on the testing graphs over the training period.
 
-\includegraphics[scale=0.5]{../ER_20spin/eco/min_cover/network/loss.png}
+\begin{figure}[ht]
+    \caption{Training Loss and Average Solution $|V| = 20$}
+    \centering
+    \includegraphics[scale=0.5]{../ER_20spin/eco/min_cover/network/loss.png}
 
-\includegraphics[scale=0.5]{../ER_20spin/eco/min_cover/network/training_curve.png}
-
-\textbf{INSERT CURRENT TEST AND TRAINING RUNS}
-
-\subsection{Generalization, Single Subset}
-
-In order for this network to solve different problems, the observations, rewards and actions needs to be modified in such a way that they can be generalized to other problems on graphs with an input $G = (V, E)$. Currently, the most intuitive of these to generalize is the actions. In the network's current state, the action is defined in a way that exclusively works for problems where the solution is a subset $V$, minimizing or maximizing some function. For example, in both maximum and minimum cut problems, the solution is a subset of the vertices of a graph. For the Minimum Vertex Cover, this principle also applies, as the solution will be some $S \subset V$. This specific type of output representation exists for numerous graph problems. For example, the Minimum Quotient Cut also requires the solution to be a subset of $V$. Therefore, if some way of measuring a reward and observations for this problem exists, it should also be solvable with this network structure. In general, due to the way the actions are defined through the Q function, any problem where the solution is some $S \subset V$ should be a target of study for this network to be able to solve. 
-
-\subsection{Generalization, Multiple Subset}
-
-However, we can push this idea further. Suppose we consider an action as moving vertex $v \in V$ from one subset to another. For the current problems being considered, suppose sets $S_1$ and $S_2$, such that $S_1 \cup S_2 = V$, where $S_1$ is the solution and $S_2 = V / S_1$. If we wanted to generalize this to account for a problem where the solution is $k$ subsets of $V$, we could create $k$ actions, one for every subset required for the problem, $S_1, S_2, ... S_k$. This doesn't generalize if $k$ is variable, as the output would need to change on a per-problem basis and therefore would require a new network to be trained for each instance. Further, this would create "invalid" actions, such as selecting action $a_k$ on vertex $v \in S_k$, which would move it to the same subset that it already belonged to. 
-
-Instead, suppose for some problem, actions $a_1$ and $a_2$. Action $a_1$ would be the action of moving vertex $v \in V$ from $S_i$ to $S_{i-1}$. Consequently, $a_2$ is the action of moving vertex $v$ from $S_i$ to $S_{i+1}$. If $v \in S_1$, then $a_1$ would move $v$ to $S_n$ and similarly if $v \in S_n$, then $a_2$ would move $v$ to $S_1$. For the current problems where there would exist only sets $S_1$ and $S_2$, both actions 
-
-REVIEW
-DAVID JOHNSON BOOK ON NP-HARDNESS
-Computers and Intractability: A guide to the theory of NP-completeness
-M R Garey, D S Johnson 
-
-A compendium of NP optimization problems 
-csc.kth.se
+    \includegraphics[scale=0.5]{../ER_20spin/eco/min_cover/network/training_curve.png}
+    \label{fig:training-mvc-20}
+\end{figure}
 
 
 
-\textbf{Just some footnotes/brainstorming for now}
+\begin{figure}[ht]
+    \caption{Training Loss and Average Solution $|V| = 60$}
+    \centering
+    \includegraphics[scale=0.5]{../ER_60spin/eco/min_cover/network/loss.png}
 
-To generalize these ideas to any problem, some framework needs to be solidified for choosing observations and rewards. Something related to the constraints of the problem (if any) would need to be specified. For Minimum Vertex Cover there's a simple way of doing this as described in it is section, but extending this to other problems is more difficult. Further, there's no real way that I know of that could actually confirm whether other frameworks for learning would actually yield good results other than manually verifying it by creating the observations and reward mechanism then training a network (obviously bad and not very useful).
+    \includegraphics[scale=0.5]{../ER_60spin/eco/min_cover/network/training_curve.png}
+    \label{fig:training-mvc-60}
+\end{figure}
 
-Definitely problems arise if the decision isn't binary, adding or removing a vertex from a single solution set, like with Minimum K-Cut. For a problem like the Traveling Salesman Problem, there's the issue that the solution isn't just splitting the graph into two sets, but is instead an ordered list. 
 
+
+\subsection{Testing}
+
+To test the network, it was compared to other algorithms on a set of validation graphs of different sizes. First, the CPLEX linear program solver was set to solve the Minimum Vertex Cover. I also used a greedy algorithm which takes an initial state $S \subseteq V$ and makes greedy actions for $2|V|$ steps based on the score function defined for the neural network. I also implemented a matching algorithm, which selects a random uncovered edge and puts the nodes incident on the edges into $S$. Once there are no more uncovered edges, the algorithm terminates. I also evaluated the minimum weighted cover implemented by Python's NetworkX library, which is based on the work of \textit{Bar-Yehuda and Even} \cite{min-weighted-cover-bar}, that has a worst case run-time of $O(m * log(n))$ and approximation ratio $2 - \frac{1}{k}$, where $k$ is the smallest integer that satisfies $(2k - 1)^k \ge n$. 
+
+Because some of these algorithms are randomized either through implementation or input, any of these were instead run 50 times on each validation graph and the mean solution was selected as the found solution for that graph. The following results show the average cover found by CPLEX, matching algorithm, greedy algorithm with a randomized initalization and empty initialization, local-ratio algorithm and three initializations for the neural network; one where the initial states were random in which case the mean solution found was used over 50 attempts from random states, one test from an empty starting state, and one test from the state where every node is in the cover. Figure \ref{fig:test-20} includes the results found for training the network on graphs with $|V| = 20$.
+
+\begin{figure}[ht]
+    \caption{Average Cover Found on Validation Graphs}
+    \centering
+    \includegraphics[angle=90, scale=0.35]{../test20.png}
+    \label{fig:test-20}
+\end{figure}
+
+These results show that the Minimum Vertex Cover is likely a relatively easy problem to solve on small graphs, as the network gets very close to the optimal solution on average, but only marginally improves on the solutions found by the minimum weighted cover solution from \cite{min-weighted-cover-bar}, as well as the greedy solution, which picks greedy for edges and culls vertices randomly until a local optimum is found or the algorithm terminates. More tests on graphs significantly larger than the current ones evaluated should be run to determine whether this truly scales up to large graphs or the performance degrades.
+
+\section{Generalization, Single Subset}
+
+In order for this network to solve different problems, the observations, rewards and actions needs to be modified in such a way that they can be generalized to other problems on graphs with an input $G = (V, E)$. Currently, the most intuitive of these to generalize is the actions. In the network's current state, the action is defined in a way that exclusively works for problems where the solution is a subset $V$, minimizing or maximizing some function. For example, in both maximum and minimum cut problems, the solution is a subset of the vertices of a graph. For the Minimum Vertex Cover, this principle also applies, as the solution will be some $S \subseteq V$. This specific type of output representation exists for numerous graph problems. For example, the Minimum Quotient Cut also requires the solution to be a subset of $V$. Therefore, if some way of measuring a reward and observations for this problem exists, it should also be solvable with this network structure. In general, due to the way the actions are defined through the Q function, any problem where the solution is some $S \subseteq V$ should be a target of study for this network to be able to solve. 
+
+\subsection{Reward}
+
+\subsection{Observations}
+
+% \subsection{Generalization, Multiple Subset}
+
+% However, we can push this idea further. Suppose we consider an action as moving vertex $v \in V$ from one subset to another. For the current problems being considered, suppose sets $S_1$ and $S_2$, such that $S_1 \cup S_2 = V$, where $S_1$ is the solution and $S_2 = V / S_1$. If we wanted to generalize this to account for a problem where the solution is $k$ subsets of $V$, we could create $k$ actions, one for every subset required for the problem, $S_1, S_2, ... S_k$. This doesn't generalize if $k$ is variable, as the output would need to change on a per-problem basis and therefore would require a new network to be trained for each instance. Further, this would create "invalid" actions, such as selecting action $a_k$ on vertex $v \in S_k$, which would move it to the same subset that it already belonged to. 
+
+% Instead, suppose for some problem, actions $a_1$ and $a_2$. Action $a_1$ would be the action of moving vertex $v \in V$ from $S_i$ to $S_{i-1}$. Consequently, $a_2$ is the action of moving vertex $v$ from $S_i$ to $S_{i+1}$. If $v \in S_1$, then $a_1$ would move $v$ to $S_n$ and similarly if $v \in S_n$, then $a_2$ would move $v$ to $S_1$. For the current problems where there would exist only sets $S_1$ and $S_2$, both actions 
+
+% REVIEW
+% DAVID JOHNSON BOOK ON NP-HARDNESS
+% Computers and Intractability: A guide to the theory of NP-completeness
+% M R Garey, D S Johnson 
+
+% A compendium of NP optimization problems 
+% csc.kth.se
+
+
+
+% \textbf{Just some footnotes/brainstorming for now}
+
+% To generalize these ideas to any problem, some framework needs to be solidified for choosing observations and rewards. Something related to the constraints of the problem (if any) would need to be specified. For Minimum Vertex Cover there's a simple way of doing this as described in it is section, but extending this to other problems is more difficult. Further, there's no real way that I know of that could actually confirm whether other frameworks for learning would actually yield good results other than manually verifying it by creating the observations and reward mechanism then training a network (obviously bad and not very useful).
+
+% Definitely problems arise if the decision isn't binary, adding or removing a vertex from a single solution set, like with Minimum K-Cut. For a problem like the Traveling Salesman Problem, there's the issue that the solution isn't just splitting the graph into two sets, but is instead an ordered list. 
+
+
+\newpage
 \bibliography{main}
 \bibliographystyle{ieeetr}
 
