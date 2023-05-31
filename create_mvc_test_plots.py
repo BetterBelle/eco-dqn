@@ -17,7 +17,7 @@ algorithms = ["CPLEX",
 ind = np.arange(len(x))
 width = 0.12
 
-with open('test_data40.txt') as f:
+with open('test_data200.txt') as f:
     solution_data = eval(f.read())
 
 bars = []
@@ -36,4 +36,4 @@ plt.ylabel("Mean Cover Size")
 plt.title("Mean Cover Size by Algorithm on Validation Graphs (Erdős-Rényi; p=0.15)")
 plt.xticks(ind + width * len(solution_data) / 2, x)
 plt.legend(tuple(bars), tuple(algorithms))
-plt.savefig('test40.png')
+plt.savefig('test200.png')
