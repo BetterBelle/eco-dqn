@@ -253,6 +253,7 @@ This means we have the following observations for the Minimum Vertex Cover:
 This leaves us with local observations 1-4 and global observations 5-11 which all grant information about the state of the solution at that time, both for local changes and global differences from the best observed solution.
 
 \subsection{Reward Shaping}
+\label{sec:mvc_reward}
 
 Due to the difference between how proposed solutions are going to be in the Maximum Cut and Minimum Vertex Cover, some different rewards are going to be required to adequately represent the problem. In ECO-DQN \cite{eco-dqn}, the reward for a certain state is framed as
 
@@ -264,7 +265,7 @@ In S2V-DQN \cite{s2v-dqn}, the reward for a Minimum Vertex Cover they define as 
 
 In our case, the best seen is not so simply defined. Because constructed candidates may not be valid, some way to compare invalid candidates to valid ones has to be devised such that we can choose a previous "best" candidate to use as a comparison for future candidates. What we want is a reward mechanism that allows valid candidates to always be chosen as the best over invalid ones, as well as for valid candidates to be compared to each other in such a way that a candidate that improves the solution gives a better reward than ones that don't. Similarly for invalid candidates, we would like for them to be compared to each other in such a way that an invalid candidate that is closer in some measure to being a valid solution gives a better reward than one that is further away. One way to do this is to ensure that valid solutions gives positive rewards increasing in magnitude depending on it is quality, and for invalid solutions to give negative rewards increasing in magnitude depending on it is relative lack of closeness to being a valid candidate.
 
-For the Minimum Vertex Cover, the score of a valid candidate can be defined in a similar way as in S2V-DQN by calculating the size of the set not including the current candidate solution, $|V / V'|$. This grants higher scores to smaller candidate set sizes. Therefore when comparing valid candidates using the same reward function as ECO-DQN, we will get positive rewards for smaller set sizes. We can of course normalize this value by the number of vertices to accommodate different graph sizes.
+For the Minimum Vertex Cover, the score of a valid candidate can be defined in a similar way as in S2V-DQN by calculating the size of the set not including the current candidate solution, $|V / S|$. This grants higher scores to smaller candidate set sizes. Therefore, when comparing valid candidates using the same reward function as ECO-DQN, we will get positive rewards for smaller set sizes. We can of course normalize this value by the number of vertices to accommodate different graph sizes. In order to account for invalid candidates being scored more highly in this measure, we'll multiply this value by $0$ if the candidate is invalid and $1$ otherwise. This function we can simply call the validity of $S$.
 
 For invalid candidates, their scores can be the negative of the number of edges not covered by the candidate. Therefore, invalid candidates being compared will give greater positive rewards for getting closer to a valid solution. Of course, this also will result in positive rewards for moving from an invalid candidate to a valid one. To normalize this, we can use the number of edges in the graph, to account for graphs with differing numbers of edges. A property of using this for getting the score of an invalid candidate is that valid candidates always have exactly zero uncovered edges.
 
@@ -274,7 +275,7 @@ $score(S) = validity(S) * |V / S| - edges\_uncovered(S)$.
 
 Where $S$ is the current candidate solution state being evaluated. Normalizing this score would be similar,
 
-$norm\_score(S) = validity(S) * |V / S| / |V| - edges\_uncovered(S) / |E|$. 
+$norm\_score(S) = \frac{validity(S) * |V / S|}{|V|} - \frac{edges\_uncovered(S)}{|E|}$. 
 
 To elaborate on the previous point mentioned in the Observations section of the Minimum Vertex Cover, this means that when starting from the empty candidate solution, the largest possible change in score would be difference between the score for $|V / S| = |V|$ and the score for an invalid solution, maximizing the number of edges uncovered such that when a vertex is added, the solution is now valid. This would be like adding the vertex of highest degree to the current candidate, resulting in the empty solution, while also being a valid solution. 
 
@@ -339,6 +340,36 @@ These results show that the Minimum Vertex Cover is likely a relatively easy pro
 In order for this network to solve different problems, the observations, rewards and actions needs to be modified in such a way that they can be generalized to other problems on graphs with an input $G = (V, E)$. Currently, the most intuitive of these to generalize is the actions. In the network's current state, the action is defined in a way that exclusively works for problems where the solution is a subset $V$, minimizing or maximizing some function. For example, in both maximum and minimum cut problems, the solution is a subset of the vertices of a graph. For the Minimum Vertex Cover, this principle also applies, as the solution will be some $S \subseteq V$. This specific type of output representation exists for numerous graph problems. For example, the Minimum Quotient Cut also requires the solution to be a subset of $V$. Therefore, if some way of measuring a reward and observations for this problem exists, it should also be solvable with this network structure. In general, due to the way the actions are defined through the Q function, any problem where the solution is some $S \subseteq V$ should be a target of study for this network to be able to solve. 
 
 \subsection{Reward}
+
+Based on the results we've achieved in the Minimum Vertex Cover, the idea that a measure for the solution's quality subtracted by a measure for invalidity is a good place from which to start generalizing. A simple way to do this is to define a function that gives a positive score based on the measure of a candidate state as defined by the problem statement. Determining this function differs between maximization and minimization problems as the value of the reward will change in magnitude based on the measure. For invalid candidates, we'll need to create some measure to evaluate the distance from a valid candidate. This value can then be increasingly large based on the distance and only gives a value if the problem is invalid. This is entirely problem dependent and therefore needs to be considered differently for every problem. However, there are three generally applicable ideas for some problems:
+
+\begin{enumerate}
+    \item Problems that determine validity based on a count of vertices can have their validity measured by the number of vertices that need to be removed from $S$ and into $V / S$ in order to be valid.
+    \item Problems that determine validity based on a count of edges can have their validity measured by the number of edges over or under the problem requirement that would be necessary to make the current candidate valid. 
+    \item Problems that determine validity based on a constraint being satisfied by some function of the candidate solution can have their validity determined by the difference between the current candidate's value based on that function and the requirement. For example, in the Maximum Edge Subgraph problem, $|S|$ must equal a positive integer $k$. We can therefore compute an absolute difference between $|S|$ and $k$ to determine a reward for invalidity.
+\end{enumerate}
+
+With all of this in mind, we'll have a general idea of a function for the score $score(S)$ of a candidate solution being the invalidity measure, which I'll refer to as $invalidity(S)$, subtracted from the problem measure score, which I'll refer to as $measure\_score(S)$. To combine these, we'll need the function for validity of $S$ that we defined in Section \ref{sec:mvc_reward}, Minimum Vertex Cover - Reward Shaping, which we'll refer to as $validity(S)$. Combining these we'll get:
+
+$score(S) = validity(S) * measure\_score(S) - invalidity(S)$
+
+To normalize this score to be used in the reward function, we can use an upper bound for the problem measure score $UM$ and an upper bound for the invalidity measure $UI$ to guarantee the score for a solution being in the interval $[-1, 1]$. 
+
+$norm\_score(S) = \frac{validity(S) * measure\_score(S)}{UM} - \frac{invalidity(S)}{UI}$
+
+In the end, repeating what we did with the Minimum Vertex Cover from the idea in ECO-DQN, we can then define the reward for a candidate solution as 
+
+$R(S) = max(0, norm\_score(S) - norm\_score(S^*))$
+
+This echoes exactly our mechanism for the Minimum Vertex Cover, where $measure\_score(S) = |V / S|$, $invalidity(S) = edges\_uncovered(S)$, $UM = |V|$ and $UI = |E|$.
+
+\subsubsection{Maximization Problems}
+
+We can easily define the score of a candidate solution for a maximization problem by defining it exactly by the measure. For any problem where this measure can be a negative value, we can find a negative lower bound for the solution measure and offset every reward by this value to make them positive. This lower bound for the measure, $LM$, can be defined as $abs(min(0, LB))$, where $LB$ is the actual lower bound for the measure. In this way, we can define $measure\_score(S) = measure(S) + LM$. In this case, we can also define the value for $UM = UB + LM$, where $UB$ is an estimated upper bound for the measure.  
+
+\subsubsection{Minimization Problems}
+
+For minimization problems, we'll instead need to define the measure score by using values that invert the order of the measure scores for different candidates. The simplest way to do this is exactly as was done in the implementation of the Minimum Cut problem where we change the score to be the negative of the measure. However, this will result in negative scores and as such, negative rewards. To make all of these values positive, we can simply add the positive upper bound of the measure to every score to guarantee that the value will be positive. Therefore, $measure\_score(S) = - measure(S) + max(0, UB)$. If every single measure is negative, this therefore guarantees only positive scores for valid candidates to a minimization problem. We also need to define a new $UM$ for minimization problems. In this case, $UM = - LB + max(0, UB)$ uses the negative of the theoretical lower bound of the measure and offsets it by the value we assigned to guarantee all values for the measure's score are normalized to less than $1$. Based on our Minimum Vertex Cover implementation, this would be $- |S| + |V|$ or $|V / S|$ for the $measure\_score(S)$. The value for $UM$ would therefore be $|V|$ as the lower bound for the Minimum Vertex Cover is $0$. This is precisely the mechanism we used.
 
 \subsection{Observations}
 
