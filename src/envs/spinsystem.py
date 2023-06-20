@@ -416,9 +416,9 @@ class SpinSystemBase():
             #         rew /= self.n_spins
             ###
 
-        ### No idea what this is for, ignore it for now
-        # if self.reward_signal == RewardSignal.DENSE:
-        #     rew = delta_score
+        ### Dense reward signal is for s2v-dqn
+        if self.reward_signal == RewardSignal.DENSE:
+            rew = delta_score_normalized if self.norm_rewards else delta_score
         # elif self.reward_signal == RewardSignal.SINGLE and done:
         #     rew = self.score - self.init_score
         ###
