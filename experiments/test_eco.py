@@ -11,7 +11,8 @@ from experiments.utils import test_network, load_graph_set
 from src.envs.utils import (SingleGraphGenerator,
                             RewardSignal, ExtraAction,
                             OptimisationTarget, SpinBasis,
-                            MVC_OBSERVABLES, EdgeType, DEFAULT_OBSERVABLES)
+                            MVC_OBSERVABLES, EdgeType, DEFAULT_OBSERVABLES,
+                            Observable)
 from src.networks.mpnn import MPNN
 from src.agents.solver import CplexSolver, CoverMatching, NetworkXMinCoverSolver, Greedy
 from src.envs.spinsystem import SpinSystemBase
@@ -269,27 +270,47 @@ def run(num_vertices, problem_type, graph_type, problem_params):
         f.write(str(solutions))
 
 
-def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER'):
+def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER', network_type='eco'):
     if problem_type == 'min_cover':
         problem_params = {
-           'optimisation': OptimisationTarget.MIN_COVER,
-           'edge_type': EdgeType.UNIFORM,
-           'observables': MVC_OBSERVABLES
+            'optimisation': OptimisationTarget.MIN_COVER,
+            'edge_type': EdgeType.UNIFORM,
+            'observables': MVC_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1/num_vertices,
+            'reward_signal': RewardSignal.BLS
         }
     elif problem_type == 'max_cut':
         problem_params = {
             'optimisation': OptimisationTarget.CUT,
             'edge_type': EdgeType.DISCRETE,
-            'observables': DEFAULT_OBSERVABLES
+            'observables': DEFAULT_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1/num_vertices,
+            'reward_signal': RewardSignal.BLS
         }
     elif problem_type == 'min_cut':
         problem_params = {
             'optimisation': OptimisationTarget.MIN_CUT,
             'edge_type': EdgeType.DISCRETE,
-            'observables': DEFAULT_OBSERVABLES
+            'observables': DEFAULT_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1/num_vertices,
+            'reward_signal': RewardSignal.BLS
         }
     else:
         print('Invalid problem type.')
+        exit(1)
+
+    if network_type == 'eco':
+        pass
+    elif network_type == 's2v':
+        problem_params['observables'] = [Observable.SPIN_STATE]
+        problem_params['reversible_spins'] = False
+        problem_params['basin_reward'] = None
+        problem_params['reward_signal'] = RewardSignal.DENSE
+    else:
+        print('Invalid network type.')
         exit(1)
 
     run(num_vertices, problem_type, graph_type, problem_params)
@@ -326,4 +347,5 @@ if __name__ == "__main__":
     num_vertices = 20
     graph_type = 'ER'
     problem_type = 'min_cover'
-    run_with_params(num_vertices, problem_type, graph_type)
+    network_type = 'eco'
+    run_with_params(num_vertices, problem_type, graph_type, network_type)
