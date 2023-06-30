@@ -61,17 +61,17 @@ def run(num_vertices, problem_type, graph_type, problem_params):
 
     step_factor = 2
 
-    env_args = {'observables': problem_params['observables'],
-                'reward_signal': RewardSignal.BLS,
-                'extra_action': ExtraAction.NONE,
-                'optimisation_target': problem_params['optimisation'],
-                'spin_basis': SpinBasis.SIGNED,
-                'norm_rewards': True,
-                'memory_length': None,
-                'horizon_length': None,
-                'stag_punishment': None,
-                'basin_reward': 1. / num_vertices,
-                'reversible_spins': True}
+    env_args = {'observables':problem_params['observables'],
+                'reward_signal':problem_params['reward_signal'],
+                'extra_action':ExtraAction.NONE,
+                'optimisation_target':problem_params['optimisation'],
+                'spin_basis':SpinBasis.SIGNED,
+                'norm_rewards':True,
+                'memory_length':None,
+                'horizon_length':None,
+                'stag_punishment':None,
+                'basin_reward':problem_params['basin_reward'],
+                'reversible_spins':problem_params['reversible_spins']}
 
     ####################################################
     # LOAD VALIDATION GRAPHS
@@ -144,7 +144,7 @@ def run(num_vertices, problem_type, graph_type, problem_params):
         for j, test_graph in enumerate(graphs):
             env_args = {
                 'observables': problem_params['observables'],
-                'reward_signal': RewardSignal.BLS,
+                'reward_signal': problem_params['reward_signal'],
                 'extra_action': ExtraAction.NONE,
                 'optimisation_target': problem_params['optimisation'],
                 'spin_basis': SpinBasis.SIGNED,
@@ -153,8 +153,8 @@ def run(num_vertices, problem_type, graph_type, problem_params):
                 'horizon_length': None,
                 'stag_punishment': None,
                 'basin_reward': 1. / test_graph.shape[0],
-                'reversible_spins': True
-                }
+                'reversible_spins': problem_params['reversible_spins']
+            }
             
             # Create the environments that the solvers will run on
             # For solvers that only need to be tested once, just use the first environment
@@ -277,7 +277,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'edge_type': EdgeType.UNIFORM,
             'observables': MVC_OBSERVABLES,
             'reversible_spins': True,
-            'basin_reward': 1/num_vertices,
+            'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
     elif problem_type == 'max_cut':
@@ -286,7 +286,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'edge_type': EdgeType.DISCRETE,
             'observables': DEFAULT_OBSERVABLES,
             'reversible_spins': True,
-            'basin_reward': 1/num_vertices,
+            'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
     elif problem_type == 'min_cut':
@@ -295,7 +295,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'edge_type': EdgeType.DISCRETE,
             'observables': DEFAULT_OBSERVABLES,
             'reversible_spins': True,
-            'basin_reward': 1/num_vertices,
+            'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
     else:

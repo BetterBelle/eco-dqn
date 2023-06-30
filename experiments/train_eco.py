@@ -250,7 +250,7 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
             'edge_type': EdgeType.UNIFORM,
             'observables': MVC_OBSERVABLES,
             'reversible_spins': True,
-            'basin_reward': 1/num_vertices,
+            'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
     elif problem_type == 'max_cut':
@@ -259,7 +259,7 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
             'edge_type': EdgeType.DISCRETE,
             'observables': DEFAULT_OBSERVABLES,
             'reversible_spins': True,
-            'basin_reward': 1/num_vertices,
+            'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
     elif problem_type == 'min_cut':
@@ -268,7 +268,7 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
             'edge_type': EdgeType.DISCRETE,
             'observables': DEFAULT_OBSERVABLES,
             'reversible_spins': True,
-            'basin_reward': 1/num_vertices,
+            'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
     else:
