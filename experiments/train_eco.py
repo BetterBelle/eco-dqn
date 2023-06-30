@@ -16,7 +16,8 @@ from src.envs.utils import (SetGraphGenerator,
                             EdgeType, RewardSignal, ExtraAction,
                             OptimisationTarget, SpinBasis,
                             MVC_OBSERVABLES, DEFAULT_OBSERVABLES,
-                            RandomBarabasiAlbertGraphGenerator)
+                            RandomBarabasiAlbertGraphGenerator,
+                            Observable)
 from src.networks.mpnn import MPNN
 
 try:
@@ -40,7 +41,7 @@ def run(num_vertices, problem_type, dqn_params, problem_params, graph_type, trai
     step_fact = 2
 
     env_args = {'observables':problem_params['observables'],
-                'reward_signal':RewardSignal.BLS,
+                'reward_signal':problem_params['reward_signal'],
                 'extra_action':ExtraAction.NONE,
                 'optimisation_target':problem_params['optimisation'],
                 'spin_basis':SpinBasis.SIGNED,
@@ -48,8 +49,8 @@ def run(num_vertices, problem_type, dqn_params, problem_params, graph_type, trai
                 'memory_length':None,
                 'horizon_length':None,
                 'stag_punishment':None,
-                'basin_reward':1./num_vertices,
-                'reversible_spins':True}
+                'basin_reward':problem_params['basin_reward'],
+                'reversible_spins':problem_params['reversible_spins']}
 
     ####################################################
     # SET UP TRAINING AND TEST GRAPHS
@@ -242,28 +243,49 @@ def run(num_vertices, problem_type, dqn_params, problem_params, graph_type, trai
 
 
 
-def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER'):
+def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', network_type='eco'):
     if problem_type == 'min_cover':
         problem_params = {
-           'optimisation': OptimisationTarget.MIN_COVER,
-           'edge_type': EdgeType.UNIFORM,
-           'observables': MVC_OBSERVABLES
+            'optimisation': OptimisationTarget.MIN_COVER,
+            'edge_type': EdgeType.UNIFORM,
+            'observables': MVC_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1/num_vertices,
+            'reward_signal': RewardSignal.BLS
         }
     elif problem_type == 'max_cut':
         problem_params = {
             'optimisation': OptimisationTarget.CUT,
             'edge_type': EdgeType.DISCRETE,
-            'observables': DEFAULT_OBSERVABLES
+            'observables': DEFAULT_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1/num_vertices,
+            'reward_signal': RewardSignal.BLS
         }
     elif problem_type == 'min_cut':
         problem_params = {
             'optimisation': OptimisationTarget.MIN_CUT,
             'edge_type': EdgeType.DISCRETE,
-            'observables': DEFAULT_OBSERVABLES
+            'observables': DEFAULT_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1/num_vertices,
+            'reward_signal': RewardSignal.BLS
         }
     else:
         print('Invalid problem type.')
         exit(1)
+
+    if network_type == 'eco':
+        pass
+    elif network_type == 's2v':
+        problem_params['observables'] = [Observable.SPIN_STATE]
+        problem_params['reversible_spins'] = False
+        problem_params['basin_reward'] = None
+        problem_params['reward_signal'] = RewardSignal.DENSE
+    else:
+        print('Invalid network type.')
+        exit(1)
+    
 
     if graph_type == 'ER':
         graph_generator = RandomErdosRenyiGraphGenerator(
@@ -338,4 +360,5 @@ if __name__ == "__main__":
     num_vertices = 20
     problem_type = 'min_cover'
     graph_type = 'ER'
-    run_with_vars(num_vertices, problem_type, graph_type)
+    network_type = 'eco'
+    run_with_vars(num_vertices, problem_type, graph_type, network_type)

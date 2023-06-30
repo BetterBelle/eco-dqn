@@ -76,7 +76,7 @@ def run(num_vertices, problem_type, graph_type, problem_params):
     # LOAD VALIDATION GRAPHS
     ####################################################
 
-    graph_sizes = [200]
+    graph_sizes = [20, 40, 60, 80, 100, 200, 500]
     all_graphs = []
 
     ### TODO modify this to work with BA graphs as well
@@ -112,6 +112,8 @@ def run(num_vertices, problem_type, graph_type, problem_params):
     network.eval()
 
     print("Sucessfully created agent with pre-trained MPNN.\nMPNN architecture\n\n{}".format(repr(network)))
+
+    ### SETUP TESTS
 
     batch_size = 50
     solutions = {
@@ -163,6 +165,7 @@ def run(num_vertices, problem_type, graph_type, problem_params):
                                             **env_args)
             
 
+            print("Running CPLEX Solver")
             cplex_solver = CplexSolver(env=test_envs[0])
             cplex_solver.reset()
             cplex_solver.solve()
