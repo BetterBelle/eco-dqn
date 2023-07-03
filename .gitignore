@@ -17,3 +17,7 @@ log_data.pkl
 # Ignore network weights and pickles
 network[0-9]*.pth
 *.pkl
+
+# Ignore data about test and training
+ER_[1-9]*spin
+test_data*

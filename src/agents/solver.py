@@ -6,7 +6,7 @@ import numpy as np
 import networkx as nx
 import torch
 import random
-import cplex
+from docplex.mp.model import Model
 
 class SpinSolver(ABC):
     """Abstract base class for agents solving SpinSystem Ising problems."""
@@ -271,9 +271,7 @@ class CoverMatching(SpinSolver):
 class CplexSolver(SpinSolver):
     def __init__(self, env: SpinSystemBase, record_cut=False, record_rewards=False, record_qs=False, verbose=False):
         super().__init__(env, record_cut, record_rewards, record_qs, verbose)
-        self._solver = cplex.Cplex()
-        self._solver.set_log_stream(None)
-        self._solver.set_results_stream(None)
+        self._solver : Model = None
 
     def reset(self, spins=None):
         """
@@ -282,44 +280,27 @@ class CplexSolver(SpinSolver):
         super().reset(spins)
         ### Generate the problem parameters
         if self.env.optimisation_target == OptimisationTarget.MIN_COVER:
-            self._solver.set_problem_name("Minimum Vertex Cover")
-            self._solver.set_problem_type(cplex.Cplex.problem_type.LP)
-            self._solver.objective.set_sense(self._solver.objective.sense.minimize)
-            
-            names = [str(i) for i in range(self.env.n_spins)]
-            w_obj = [1] * self.env.n_spins
-            lb = [0] * self.env.n_spins
-            ub = [1] * self.env.n_spins
+            self._solver = Model('Minimum Vertex Cover')
+            variables = self._solver.integer_var_list(len(self.env.matrix), 0, 1, 'x')
 
-            self._solver.variables.add(names=names, obj=w_obj, lb=lb, ub=ub)
-
-            all_int = [(var, self._solver.variables.type.integer) for var in names]
-            self._solver.variables.set_types(all_int)
-
-            constraints = []
-            # Go through each node and add a constraint for the edges in the upper triangular part of the adjacency matrix
             for i in range(len(self.env.matrix)):
-                ### Start from i in each row so we don't double count edges
-                for j in range(i, len(self.env.matrix)):
-                    ### If there is an edges from i to j, add a constraint with their names and weight 1
+                for j in range(len(self.env.matrix[i])):
                     if self.env.matrix[i][j] == 1:
-                        constraints.append([[str(i),str(j)], [1, 1]])
+                        self._solver.add_constraint(variables[i] + variables[j] >= 1, 'x_{}, x_{}'.format(i, j))
 
-            # The names of the constrains, just being the string i,j
-            constraint_names = [",".join(x[0]) for x in constraints]
-            # Each edges must have at least one vertex
-            rhs = [1] * len(constraints)
-            # Constraint is always a lower limit, therefore "G"
-            constraint_senses = ["G"] * len(constraints)
-            self._solver.linear_constraints.add(names=constraint_names, 
-                                                 lin_expr=constraints, 
-                                                 senses=constraint_senses,
-                                                 rhs=rhs)
+            self._solver.minimize(self._solver.sum(variables))
 
     def solve(self):
         self._solver.solve()
-        print("CPLEX solution result is {}".format(self._solver.solution.get_status_string()))
-        self.env.reset(2 * np.array(self._solver.solution.get_values(), dtype=np.int64) - 1)
+        self._solver.print_information()
+
+        solution = [0.0] * len(self.env.matrix)
+        for i, v in enumerate(self._solver.iter_integer_vars()):
+            if v.solution_value == 1:
+                solution[i] = v.solution_value
+
+        print(self._solver.solution)
+        self.env.reset(2 * np.array(solution, dtype=np.int64) - 1)
 
     def step(self, *args):
         """
