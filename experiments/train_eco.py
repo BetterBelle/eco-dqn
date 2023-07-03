@@ -4,9 +4,6 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 
-import sys
-sys.path.insert(0, '/home/cloudan/Documents/School/Project/eco-dqn')
-
 import src.envs.core as ising_env
 from experiments.utils import load_graph_set, mk_dir
 from src.agents.dqn.dqn import DQN

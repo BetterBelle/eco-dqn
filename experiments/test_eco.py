@@ -3,9 +3,6 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 
-import sys
-sys.path.insert(0, '/home/cloudan/Documents/School/Project/eco-dqn')
-
 import src.envs.core as ising_env
 from experiments.utils import test_network, load_graph_set
 from src.envs.utils import (SingleGraphGenerator,
