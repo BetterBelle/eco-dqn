@@ -262,9 +262,9 @@ def run(num_vertices, problem_type, graph_type, problem_params):
         solutions['neural_network_full_start_solutions'].append(neural_network_full_start_batch)
         solutions['neural_network_random_solutions'].append(neural_network_random_batch)
     
-    # Print this data to file
-    with open("test_data{}.txt".format(num_vertices), 'w') as f:
-        f.write(str(solutions))
+        # Print this data to file for every new batch to save partway through
+        with open("test_data{}.txt".format(num_vertices), 'w') as f:
+            f.write(str(solutions))
 
 
 def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER', network_type='eco'):
