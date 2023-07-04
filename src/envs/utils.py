@@ -35,6 +35,7 @@ class SpinBasis(Enum):
 
     SIGNED = 1
     BINARY = 2
+    NUMBERED = 3
 
 class Observable(Enum):
     # Local observations that differ between nodes.
@@ -42,6 +43,13 @@ class Observable(Enum):
     IMMEDIATE_QUALITY_CHANGE = 2 # The immediate quality change on vertex flip
     IMMEDIATE_VALIDITY_DIFFERENCE = 3 # Immediate change in how much closer to a valid candidate the current state is on flip
     IMMEDIATE_VALIDITY_CHANGE = 4 # Whether the solution becomes valid on flip
+
+    # Doubled observations for local observations. These are for moving vertices "backwards" in the list
+    ALT_IMMEDIATE_QUALITY_CHANGE = 14
+    ALT_IMMEDIATE_VALIDITY_DIFFERENCE = 15
+    ALT_IMMEDIATE_VALIDITY_CHANGE = 16
+
+    # This is an exception to the doubled observations
     TIME_SINCE_FLIP = 5 # The number of steps since the vertex was changed
 
     # Global observations that are the same for all nodes.
@@ -62,6 +70,20 @@ DEFAULT_OBSERVABLES = [Observable.SPIN_STATE,
                        Observable.NUMBER_OF_QUALITY_IMPROVEMENTS,
                        Observable.TERMINATION_IMMANENCY]
 
+MAIN_OBSERVABLES = [Observable.SPIN_STATE,
+                    Observable.IMMEDIATE_QUALITY_CHANGE,
+                    Observable.IMMEDIATE_VALIDITY_DIFFERENCE,
+                    Observable.IMMEDIATE_VALIDITY_CHANGE,
+                    Observable.TIME_SINCE_FLIP,
+                    Observable.EPISODE_TIME,
+                    Observable.TERMINATION_IMMANENCY,
+                    Observable.NUMBER_OF_QUALITY_IMPROVEMENTS,
+                    Observable.NUMBER_OF_VALIDITY_IMPROVEMENTS,
+                    Observable.DISTANCE_FROM_BEST_SOLUTION,
+                    Observable.DISTANCE_FROM_BEST_STATE,
+                    Observable.GLOBAL_VALIDITY_DIFFERENCE,
+                    Observable.VALIDITY_BIT]
+
 # When invalid states are available for choosing, add observables
 MVC_OBSERVABLES = [Observable.SPIN_STATE,
                    Observable.IMMEDIATE_VALIDITY_CHANGE,
@@ -75,6 +97,23 @@ MVC_OBSERVABLES = [Observable.SPIN_STATE,
                    Observable.NUMBER_OF_VALIDITY_IMPROVEMENTS,
                    Observable.GLOBAL_VALIDITY_DIFFERENCE,
                    Observable.VALIDITY_BIT]
+
+BIG_OBSERVABLES = [ Observable.SPIN_STATE,
+                    Observable.IMMEDIATE_QUALITY_CHANGE,
+                    Observable.IMMEDIATE_VALIDITY_DIFFERENCE,
+                    Observable.IMMEDIATE_VALIDITY_CHANGE,
+                    Observable.TIME_SINCE_FLIP,
+                    Observable.EPISODE_TIME,
+                    Observable.TERMINATION_IMMANENCY,
+                    Observable.NUMBER_OF_QUALITY_IMPROVEMENTS,
+                    Observable.NUMBER_OF_VALIDITY_IMPROVEMENTS,
+                    Observable.DISTANCE_FROM_BEST_SOLUTION,
+                    Observable.DISTANCE_FROM_BEST_STATE,
+                    Observable.GLOBAL_VALIDITY_DIFFERENCE,
+                    Observable.VALIDITY_BIT,
+                    Observable.ALT_IMMEDIATE_QUALITY_CHANGE,
+                    Observable.ALT_IMMEDIATE_VALIDITY_DIFFERENCE,
+                    Observable.ALT_IMMEDIATE_VALIDITY_CHANGE]
 
 
 class GraphGenerator(ABC):

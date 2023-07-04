@@ -16,6 +16,7 @@ log_data.pkl
 
 # Ignore network weights and pickles
 network[0-9]*.pth
+*.pth
 *.pkl
 
 # Ignore data about test and training
