@@ -74,7 +74,8 @@ def run(num_vertices, problem_type, graph_type, problem_params):
     # LOAD VALIDATION GRAPHS
     ####################################################
 
-    graph_sizes = [20, 40, 60, 80, 100, 200, 500]
+    # graph_sizes = [20, 40, 60, 80, 100, 200, 500]
+    graph_sizes = [40]
     all_graphs = []
 
     ### TODO modify this to work with BA graphs as well
@@ -167,7 +168,7 @@ def run(num_vertices, problem_type, graph_type, problem_params):
             cplex_solver = CplexSolver(env=test_envs[0])
             cplex_solver.reset()
             cplex_solver.solve()
-            cplex_batch.append(test_envs[0].scorer.get_solution(test_envs[0].state[0, :test_envs[0].n_spins], test_envs[0].matrix))
+            cplex_batch.append(test_envs[0].best_solution)
 
             # Next test cover matching (run 50 tests on each graph)
             print("Running Matching Algorithm")
