@@ -5,7 +5,7 @@
 \usepackage{adjustbox}
 \usepackage{pdflscape}
 
-\graphicspath{{../src}}
+\graphicspath{{../}}
 
 \title{Progress Report}
 \author{Annabelle Cloutier}
@@ -182,7 +182,7 @@ Just as with the original idea for ECO-DQN, at each step the best found solution
 
 \subsection{Results}\label{sec:results-min-cut}
 
-The result of training found in Figure \ref{fig:min-cut-training} show this network is very similar to the maximum cut found in the ECO-DQN paper. It starts giving random solutions and eventually reaches a point where the cut value found stabilizes on the test graphs. This demonstrates that the network structure can be utilized to solve other problems. This was not tested against other algorithms, so it is possible that the cuts found are not minimal, but this provides some indication that at least the network can learn something about other problems than the Maximum Cut Problem. 
+The result of training found in %Figure \ref{fig:min-cut-training} show this network is very similar to the maximum cut found in the ECO-DQN paper. It starts giving random solutions and eventually reaches a point where the cut value found stabilizes on the test graphs. This demonstrates that the network structure can be utilized to solve other problems. This was not tested against other algorithms, so it is possible that the cuts found are not minimal, but this provides some indication that at least the network can learn something about other problems than the Maximum Cut Problem. 
 
 
 \section{Minimum Vertex Cover}\label{sec:mvc}
@@ -281,7 +281,7 @@ Training this network will be algorithmically identical to ECO-DQN \cite{eco-dqn
 
 Because the original test graphs were generated using discrete edges weights of either $1$ or $-1$, we first recreate the test graphs with the same edges but setting all the weights to $1$. This functions as an undirected, unweighted graph for evaluating a Minimum Vertex Cover. All of the training graphs will also be generated using uniform weights, on ER graphs with edge probability of $0.15$. Training and testing graphs will have the same number of vertices.
 
-Within these parameters for training and testing graphs with $|V| = 20$, the network seems to rapidly improve it is performance on the test graphs and reaching a plateau where it remains for the remainder of the training time. This same trend is observed for larger training graphs. Figures \ref{fig:training-mvc-20} and \ref{fig:training-mvc-60} show the training loss and average solution found on the testing graphs over the training period.
+Within these parameters for training and testing graphs with $|V| = 20$, the network seems to rapidly improve it is performance on the test graphs and reaching a plateau where it remains for the remainder of the training time. This same trend is observed for larger training graphs. % Figures \ref{fig:training-mvc-20} and \ref{fig:training-mvc-60} show the training loss and average solution found on the testing graphs over the training period.
 
 
 \subsection{Testing}\label{sec:testing-mvc}
@@ -401,6 +401,16 @@ If we want to extend this idea to problems with multiple subsets, we can instead
     \item Minimum Complete Bipartite Subgraph Cover 
 \end{itemize}
 
+To implement this, here are some items I'll need to go over:
+
+\begin{enumerate}
+    \item Implementing the new vertex states. Current they're a boolean mask, will have to modify to be a list of integers most likely. I've done this already.
+    \item This also means changing the neural network structure (this is something I'm not familiar with at all and is taking time to understand)
+    \item They have code for what actions are available (to implement irreversible actions). I needed to understand and modify this. This is something I've finished rather quickly.
+    \item Once all of that is done, I need to understand how the chosen actions from the network are going to be parsed to properly move the vertices between different states.
+    \item Adding the new observations. Also need to reimplement some of the other observations that depend on things like the number of actions that make a solution better/worse.
+\end{enumerate}
+
 % REVIEW
 % DAVID JOHNSON BOOK ON NP-HARDNESS
 % Computers and Intractability: A guide to the theory of NP-completeness
@@ -412,14 +422,14 @@ If we want to extend this idea to problems with multiple subsets, we can instead
 \clearpage
 \section{Figures}
 
-\begin{figure}[ht]
-    \caption{Loss and Average Cut Found on Validation Graphs During Training, $|V|=20$}
-    \centering
-    \includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/loss.png}
+% \begin{figure}[ht]
+%     \caption{Loss and Average Cut Found on Validation Graphs During Training, $|V|=20$}
+%     \centering
+%     \includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/loss.png}
 
-    \includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/training_curve.png}
-    \label{fig:min-cut-training}
-\end{figure}
+%     \includegraphics[scale=0.5]{../ER_20spin/eco/min_cut/network/training_curve.png}
+%     \label{fig:min-cut-training}
+% \end{figure}
 
 \begin{figure}[ht]
     \caption{Training Loss and Average Solution $|V| = 20$}
@@ -432,14 +442,14 @@ If we want to extend this idea to problems with multiple subsets, we can instead
 
 
 
-\begin{figure}[ht]
-    \caption{Training Loss and Average Solution $|V| = 60$}
-    \centering
-    \includegraphics[scale=0.5]{../ER_60spin/eco/min_cover/network/loss.png}
+% \begin{figure}[ht]
+%     \caption{Training Loss and Average Solution $|V| = 60$}
+%     \centering
+%     \includegraphics[scale=0.5]{../ER_60spin/eco/min_cover/network/loss.png}
 
-    \includegraphics[scale=0.5]{../ER_60spin/eco/min_cover/network/training_curve.png}
-    \label{fig:training-mvc-60}
-\end{figure}
+%     \includegraphics[scale=0.5]{../ER_60spin/eco/min_cover/network/training_curve.png}
+%     \label{fig:training-mvc-60}
+% \end{figure}
 
 \begin{figure}
     \caption{Average Cover Found on Validation Graphs}

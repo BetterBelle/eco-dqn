@@ -74,8 +74,7 @@ def run(num_vertices, problem_type, graph_type, problem_params):
     # LOAD VALIDATION GRAPHS
     ####################################################
 
-    # graph_sizes = [20, 40, 60, 80, 100, 200, 500]
-    graph_sizes = [40]
+    graph_sizes = [20, 40, 60, 80, 100, 200, 500]
     all_graphs = []
 
     ### TODO modify this to work with BA graphs as well
