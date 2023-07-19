@@ -73,6 +73,8 @@ class MPNN(nn.Module):
 
         out = self.readout_layer(current_node_embeddings)
         out = out.squeeze()
+        if out.dim() > 1:
+            out = torch.flatten(out)
 
         return out
 
@@ -131,7 +133,7 @@ class ReadoutLayer(nn.Module):
         if type(n_hid)!=list:
             n_hid = [n_hid]
 
-        n_hid = [2*n_features] + n_hid + [1]
+        n_hid = [2*n_features] + n_hid + [2]
 
         self.layers_readout = []
         for n_in, n_out in list(zip(n_hid, n_hid[1:])):

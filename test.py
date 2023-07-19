@@ -1,69 +1,38 @@
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-import operator as op
-from numba import jit, float64, int64
+import src.envs.core as ising_env
+from src.envs.utils import ( SingleGraphGenerator, MVC_OBSERVABLES, RewardSignal, ExtraAction,
+                            OptimisationTarget, SpinBasis )
+from src.networks.mpnn import MPNN
+import torch
 
-def calculate_mvc_rewards_available(matrix, spins):
-    ### Explanation: matrix multiplication of adj and spins (vertices) gives number of edges incident on that node
-    ### spins == -1 gives vertices that are not in the solution as boolean mask
-    ### Multiplying by matrix gets rid of all edges covered by nodes in solution (0s) without double counting, column wise
-    ### That result is essentially a graph removing the edges covered by the solution (but only counting once)
-    ### This new matrix multiplied by spins therefore gives the number of edges not covered by another vertex in the solution incident on each vertex
-    ### Multiplying this by the state of spins (1s not in solution and -1s in solution) gives the change in number of edges covered on flip
-    ### Sum of an adjacency matrix divided by two is the number of edges in that matrix
-    ### We want the number of edges that aren't covered by our solution (because our list counts only those edges anyway)
-    ### We can do this by multiplying by the spins and it's transpose
-    ### If we then take that value and subtract from it the change in covered edges for every vertex, we get a value that represents 
-    ### the number of vertices not covered by the solution on each vertex flip
-    ### Any value that is a 0 means by flipping that vertex you get a valid cover
-    ### We want the immediate reward to be the size of the cover on flip, but have it be -1 when invalid
-
-    # We want: If an invalid solution is created, the reward for that flip should be the number of edges that become uncovered (negative)
-    # If a valid solution is created, it should be the difference in size of the set
-    newly_covered_on_flip = spins * op.matmul(matrix * (spins == -1), spins)
-    uncovered_edges = np.sum((matrix != 0) * (spins == -1) * np.array([spins == -1], dtype=np.float64).T) / 2
-    total_uncovered_on_flip = uncovered_edges - newly_covered_on_flip
-    solution_set_size = sum(spins == 1)
-
-
-    # First get a boolean mask for validity
-    # To verify this, check if the number of uncovered edges minus the number of edges covered on flip (it's negative if it loses edges) is 0
-    validity_mask = total_uncovered_on_flip == 0
-
-    # Subtracting spins from solution set size gives you the new set size on flip
-    # We then take the total number of nodes and subtract from that the new set size to give you the size of the set not in the solution,
-    # this ensures that larger solution sets give smaller rewards (i.e. a set size of 3 with 5 nodes vs a set size of 2 with 5 nodes will now
-    # give rewards of 2 and 3 (higher reward for smaller set) instead of 3 and 2)
-    # Next, we multiply by the validity mask to keep only the valid solutions
-    new_set_size_score = validity_mask * (len(spins) - (solution_set_size - spins))
-    
-    # Next we want the new number of uncovered edges on flip (i.e. the new degree of invalidity) for each flip
-    # This is simply the uncovered edges - newly covered on flip
-    new_uncovered_edges =  uncovered_edges - newly_covered_on_flip
-
-    # Score is defined as the set score - new_uncovered edges
-    score_on_flip = new_set_size_score - new_uncovered_edges
-
-    # Now, these rewards are relative to the current state, so calculate the score for the current state
-    current_validity = (uncovered_edges == 0)
-    current_score = current_validity * (len(spins) - solution_set_size) - uncovered_edges
-
-    # Therefore immediate rewards are going to be the difference between the current score and the different scores on each flip
-    immediate_rewards_available = score_on_flip - current_score
-
-    return immediate_rewards_available
-
-
-def _calculate_mvc_score_change(new_spins, matrix, action):
+def predict(network, states, acting_in_reversible_spin_env, allowed_action_state):
     """
-    Given array of new_spins and adjacency matrix, find the score change given the spin "action" was changed
-    This is just the -1 * immediate_vertex_covers_available(old_spins), where old spins is just flipping the action
-    """
-    old_spins = new_spins
-    old_spins[action] *= -1
+    Given a network and environment states, gives actions for each environment. Because the network is on GPU, this allows multiple 
+    environments to be evaluated simultaneously.
 
-    return -1 * calculate_mvc_rewards_available(matrix, old_spins)[action]
+    TODO: MOVE THIS TO A SOLVER THAT CAN SOLVE MULTIPLE GRAPHS AT ONCE
+    """
+
+    qs = network(states)
+
+    if acting_in_reversible_spin_env:
+        if qs.dim() == 1:
+            actions = [qs.argmax().item()]
+        else:
+            actions = qs.argmax(1, True).squeeze(1).cpu().numpy()
+        return actions
+    else:
+        if qs.dim() == 1:
+            x = (states.squeeze()[:,0] == allowed_action_state).nonzero()
+            actions = [x[qs[x].argmax().item()].item()]
+        else:
+            disallowed_actions_mask = (states[:, :, 0] != allowed_action_state)
+            qs_allowed = qs.masked_fill(disallowed_actions_mask, np.finfo(np.float64).min)
+            actions = qs_allowed.argmax(1, True).squeeze(1).cpu().numpy()
+        return actions
+
 
 adjacency_matrix = np.array([
     [0, 0, 1, 0, 1, 1],
@@ -73,15 +42,53 @@ adjacency_matrix = np.array([
     [1, 1, 1, 0, 0, 1],
     [1, 1, 0, 0, 1, 0]
     ], dtype=np.float64)
-chosen_nodes = np.array([-1, -1, -1, -1, 1, 1], dtype=np.float64)
 
+env_args = {'observables':MVC_OBSERVABLES,
+                'reward_signal':RewardSignal.BLS,
+                'extra_action':ExtraAction.NONE,
+                'optimisation_target':OptimisationTarget.MIN_COVER,
+                'spin_basis':SpinBasis.SIGNED,
+                'norm_rewards':True,
+                'memory_length':None,
+                'horizon_length':None,
+                'stag_punishment':None,
+                'basin_reward':True,
+                'reversible_spins':True}
 
-full = calculate_mvc_rewards_available(adjacency_matrix, chosen_nodes)
-# print(_calculate_mvc_score_change(chosen_nodes, adjacency_matrix, 2))
-# print(adjacency_matrix)
-# print(full)
+network_fn = MPNN
+network_args = {
+    'n_layers': 3,
+    'n_features': 64,
+    'n_hid_readout': [],
+    'tied_weights': False
+}
 
-print(op.matmul(adjacency_matrix * np.array([chosen_nodes == -1]), chosen_nodes))
+test_env = ising_env.make("SpinSystem",
+                              SingleGraphGenerator(adjacency_matrix),
+                              adjacency_matrix.shape[0]*2,
+                              **env_args)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+torch.device(device)
+print("Set torch default device to {}.".format(device))
+
+network = network_fn(n_obs_in=test_env.observation_space.shape[1],
+                        **network_args).to(device)
+
+# network.load_state_dict(torch.load('ER_20spin/eco/min_cover/network/network_best.pth',map_location=device))
+for param in network.parameters():
+    param.requires_grad = False
+network.eval()
+
+print("Sucessfully created agent with pre-trained MPNN.\nMPNN architecture\n\n{}".format(repr(network)))
+
+obs_batch = test_env.reset([-1] * test_env.n_spins)
+done = False
+while not done:
+    obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
+    action = predict(network, obs_batch, test_env.reversible_spins, test_env.get_allowed_action_states())[0]
+    obs, rew, done, info = test_env.step(action)
+    obs_batch = obs
 
 
 graph = nx.Graph(adjacency_matrix)
