@@ -182,7 +182,7 @@ Just as with the original idea for ECO-DQN, at each step the best found solution
 
 \subsection{Results}\label{sec:results-min-cut}
 
-The result of training found in %Figure \ref{fig:min-cut-training} show this network is very similar to the maximum cut found in the ECO-DQN paper. It starts giving random solutions and eventually reaches a point where the cut value found stabilizes on the test graphs. This demonstrates that the network structure can be utilized to solve other problems. This was not tested against other algorithms, so it is possible that the cuts found are not minimal, but this provides some indication that at least the network can learn something about other problems than the Maximum Cut Problem. 
+The result of training found in (to be re-trained) %Figure \ref{fig:min-cut-training} show this network is very similar to the maximum cut found in the ECO-DQN paper. It starts giving random solutions and eventually reaches a point where the cut value found stabilizes on the test graphs. This demonstrates that the network structure can be utilized to solve other problems. This was not tested against other algorithms, so it is possible that the cuts found are not minimal, but this provides some indication that at least the network can learn something about other problems than the Maximum Cut Problem. 
 
 
 \section{Minimum Vertex Cover}\label{sec:mvc}
@@ -281,16 +281,18 @@ Training this network will be algorithmically identical to ECO-DQN \cite{eco-dqn
 
 Because the original test graphs were generated using discrete edges weights of either $1$ or $-1$, we first recreate the test graphs with the same edges but setting all the weights to $1$. This functions as an undirected, unweighted graph for evaluating a Minimum Vertex Cover. All of the training graphs will also be generated using uniform weights, on ER graphs with edge probability of $0.15$. Training and testing graphs will have the same number of vertices.
 
-Within these parameters for training and testing graphs with $|V| = 20$, the network seems to rapidly improve it is performance on the test graphs and reaching a plateau where it remains for the remainder of the training time. This same trend is observed for larger training graphs. % Figures \ref{fig:training-mvc-20} and \ref{fig:training-mvc-60} show the training loss and average solution found on the testing graphs over the training period.
+Within these parameters for training and testing graphs with $|V| = 20$, the network seems to rapidly improve it is performance on the test graphs and reaching a plateau where it remains for the remainder of the training time. This same trend is observed for larger training graphs. (TODO Get train visualization for 20 and 60 node graphs for figures)% Figures \ref{fig:training-mvc-20} and \ref{fig:training-mvc-60} show the training loss and average solution found on the testing graphs over the training period.
 
 
 \subsection{Testing}\label{sec:testing-mvc}
 
 To test the network, it was compared to other algorithms on a set of validation graphs of different sizes. First, the CPLEX linear program solver was set to solve the Minimum Vertex Cover. I also used a greedy algorithm which takes an initial state $S \subseteq V$ and makes greedy actions for $2|V|$ steps based on the score function defined for the neural network. I also implemented a matching algorithm, which selects a random uncovered edge and puts the nodes incident on the edges into $S$. Once there are no more uncovered edges, the algorithm terminates. I also evaluated the minimum weighted cover implemented by Python's NetworkX library, which is based on the work of \textit{Bar-Yehuda and Even} \cite{min-weighted-cover-bar}, that has a worst case run-time of $O(|E| * log(|V|))$ and approximation ratio $2 - \frac{1}{k}$, where $k$ is the smallest integer that satisfies $(2k - 1)^k \ge |V|$. 
 
-Because some of these algorithms are randomized either through implementation or input, any of these were instead run 50 times on each validation graph and the mean solution was selected as the found solution for that graph. The following results show the average cover found by CPLEX, matching algorithm, greedy algorithm with a randomized initalization and empty initialization, local-ratio algorithm and three initializations for the neural network; one where the initial states were random in which case the mean solution found was used over 50 attempts from random states, one test from an empty starting state, and one test from the state where every node is in the cover. Figure \ref{fig:test-20} includes the results found for training the network on graphs with $|V| = 20$.
+Because some of these algorithms are randomized either through implementation or input, any of these were instead run 50 times on each validation graph and the mean solution was selected as the found solution for that graph. The following results show the average cover found by CPLEX, matching algorithm, greedy algorithm with a randomized initalization and empty initialization, local-ratio algorithm and three initializations for the neural network; one where the initial states were random in which case the mean solution found was used over 50 attempts from random states, one test from an empty starting state, and one test from the state where every node is in the cover. Figure \ref{fig:test-20} includes the results found for training the network on graphs with $|V| = 20$ and tested on graphs with 20, 40, 60, 100 and 200 vertices.
 
 These results show that the Minimum Vertex Cover is likely a relatively easy problem to solve on small graphs, as the network gets very close to the optimal solution on average, but only marginally improves on the solutions found by the minimum weighted cover solution from \cite{min-weighted-cover-bar}, as well as the greedy solution, which picks greedy for edges and culls vertices randomly until a local optimum is found or the algorithm terminates. More tests on graphs significantly larger than the current ones evaluated should be run to determine whether this truly scales up to large graphs or the performance degrades.
+
+(TODO Add runtime and memory consumption (if can be collected))
 
 \section{Generalization, Single Subset}\label{sec:generalization-single-subset}
 
@@ -388,7 +390,9 @@ With the reward mechanism defined in terms of general ideas for functions and th
 
 \section{Generalization, Multiple Subset}\label{sec:multi-subset}
 
-If we want to extend this idea to problems with multiple subsets, we can instead initialize the states of each vertex to be an integer $i = 1 ... |V|$, representing the maximum number of subsets that can be created for a problem where the solution is $k$ disjoint sets of $V$. In this way, we can instead define two actions for the network as being moving the vertex to subset $i - 1$ or to subset $i + 1$ in this list of subsets. We also define the action of moving a vertex in subset $1$ to the $i-1$ subset as moving it to subset $|V|$ and moving vertex in subset $|V|$ to subset $i+1$ as moving it to subset $1$. We can then create the same observations and rewards, however, we'll double the local observations defined in Section \ref{sec:observations-generalized} that represent changes in the measure or invalidity on vertex change so as to represent both possible actions. This idea will also be applicable to single-subset problems defined in Section \ref{sec:single-subset-problems}, as we can simply bound the number of subsets to $2$ and perform the training, testing and validation in the same manner. This would allow us to consider defining measure scores, upper bounds, lower bounds, and invalidity for the following problems (not a comprehensive list):
+If we want to extend this idea to problems with multiple subsets, we can instead initialize the states of each vertex to be an integer $i = 1 ... |V|$, representing the maximum number of subsets that can be created for a problem where the solution is $k$ disjoint sets of $V$. In this way, we can instead define two actions for the network as being moving the vertex to subset $i - 1$ or to subset $i + 1$ in this list of subsets. We also define the action of moving a vertex in subset $1$ to the $i - 1$ subset as moving it to subset $|V|$ and moving vertex in subset $|V|$ to subset $i+1$ as moving it to subset $1$. This is effectively like creating a circularly linked list of subsets where the vertices can be moved around one step at a time. 
+
+We can then create the same observations and rewards, however, we'll double the local observations defined in Section \ref{sec:observations-generalized} that represent changes in the measure or invalidity on vertex change so as to represent both possible actions. This idea will also be applicable to single-subset problems defined in Section \ref{sec:single-subset-problems}, as we can simply bound the number of subsets to $2$ and perform the training, testing and validation in the same manner. This would allow us to consider defining measure scores, upper bounds, lower bounds, and invalidity for the following problems (not a comprehensive list):
 
 \begin{itemize}
     \item Maximum Domatic partition
@@ -401,15 +405,57 @@ If we want to extend this idea to problems with multiple subsets, we can instead
     \item Minimum Complete Bipartite Subgraph Cover 
 \end{itemize}
 
-To implement this, here are some items I'll need to go over:
+To implement this, here are some items I'll need to go over.
 
-\begin{enumerate}
-    \item Implementing the new vertex states. Current they're a boolean mask, will have to modify to be a list of integers most likely. I've done this already.
-    \item This also means changing the neural network structure (this is something I'm not familiar with at all and is taking time to understand)
-    \item They have code for what actions are available (to implement irreversible actions). I needed to understand and modify this. This is something I've finished rather quickly.
-    \item Once all of that is done, I need to understand how the chosen actions from the network are going to be parsed to properly move the vertices between different states.
-    \item Adding the new observations. Also need to reimplement some of the other observations that depend on things like the number of actions that make a solution better/worse.
-\end{enumerate}
+\subsection{Vertex States}
+
+First, the vertex states will need to be modified. A boolean value for each vertex will not be sufficient for a problem representing multiple subsets of the vertices. The solution to this will be to represent each vertex as an integer determining the subset to which it belongs. 
+
+We'll also need to account for different states representing the same solution. Because we'll be giving small rewards for visiting new states, we need to ensure that a new state hasn't been visited as a different permutation. For example, with a five vertex graph, the state of vertices $[1, 1, 1, 2, 2]$ is equivalent to $[2, 2, 2, 3, 3]$. This could mean requiring more observations for the network to properly recognize that these two states are equivalent, or some modifications may be made to the vertex states before they're passed into the neural network. 
+
+\subsection{Neural Network Structure}
+
+This new approach will also require the Neural Network readout to change. Instead of each vertex being assigned one action, it will instead require two, each representing the different actions of moving it forward or backwards in the list of subsets. This idea is why it's important that the state of the graph is accurately represented to the Neural Network on input, so it can make an informed decision on where to be moved.
+
+It's also necessary to understand how to change the target values of the new output in order to ensure that the network properly learns. If the target value is incorrectly implemented, it could cause the neural network to backpropagate incorrectly.
+
+\subsection{Decision Parsing}
+
+With this in mind, we'll also need to modify how the actions are parsed. Depending on the representation of the output when it's changed to two actions per vertex, we'll need a way to change the index of the list of actions into the correct action on the vertex that should be modified.
+
+\subsection{New Observations}
+
+Because of the added complexity, some new actions should be devised. The obvious ones are duplicates of the local observations for both left and right movement actions. However, specific observations for representing equivalent vertex states will likely also need to be added.
+
+\subsection{Number of Decisions}
+
+Because ECO-DQN is an intelligent exploratory agent, it's designed such that you give it a fixed number of actions to make and it will return the best state it observed during its exploration. In ECO-DQN, they set this value to $2 |V|$, which appears to be a great value to allow for adequate exploration, even in the training and testing with the Minimum Vertex Cover in Section \ref{sec:mvc}.
+
+However, with this significantly more complex idea, there will often be far more states to visit. This value of $2 |V|$ can possibly not be enough to adequately explore different states. This value can thankfully be easily modified, so it won't be an area of study until after the implementation is complete and some training and testing has been done with the original $2 |V|$ actions allowed for one exploration.
+
+\subsection{Current Progress}
+
+Completed:
+
+\begin{itemize}
+    \item New vertex states.
+    \item Neural network output.
+    \item Interpretation of neural network into an action.
+\end{itemize}
+
+Currently working on:
+
+\begin{itemize}
+    \item Understanding how to get backpropagation to function correctly.
+    \item Modification of CPLEX implementation to allow fractional solution for a lower bound to MVC due to OOM errors at $|V| = 500$.
+\end{itemize}
+
+Postponed/Ideas:
+
+\begin{itemize}
+    \item Thought of modifying the vertex states every time an action is made in a consistent way to nullify the same state being represented as different by the neural network. By sorting the subsets by size, you guarantee that the same solution will always be represented as the same state. 
+    \item New Observations should be easy to implement comparatively, this will be done once backpropagation is understood.
+\end{itemize}
 
 % REVIEW
 % DAVID JOHNSON BOOK ON NP-HARDNESS

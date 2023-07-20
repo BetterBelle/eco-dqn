@@ -28,7 +28,7 @@ for i in solution_data:
     break
 
 for alg in solution_data:
-    solution_data[alg] = list(np.divide(cplex_solutions, solution_data[alg]))
+    solution_data[alg] = list(np.divide(solution_data[alg], cplex_solutions))
 
 # Now we get the average approximation ratio for every sub-list
 for alg in solution_data:
