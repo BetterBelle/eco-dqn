@@ -281,7 +281,7 @@ class CplexSolver(SpinSolver):
         ### Generate the problem parameters
         if self.env.optimisation_target == OptimisationTarget.MIN_COVER:
             self._solver = Model('Minimum Vertex Cover')
-            variables = self._solver.integer_var_list(len(self.env.matrix), 0, 1, 'x')
+            variables = self._solver.continuous_var_list(len(self.env.matrix), 0, 1, 'x')
 
             for i in range(len(self.env.matrix)):
                 # Don't double count edges, so start from index i in the row

@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import src.envs.core as ising_env
 from src.envs.utils import ( SingleGraphGenerator, MVC_OBSERVABLES, RewardSignal, ExtraAction,
                             OptimisationTarget, SpinBasis )
+from experiments.utils import load_graph_set
+from src.agents.solver import CplexSolver
 from src.networks.mpnn import MPNN
 import torch
 
@@ -43,6 +45,13 @@ adjacency_matrix = np.array([
     [1, 1, 0, 0, 1, 0]
     ], dtype=np.float64)
 
+big_graph = np.array([[0 for _ in range(500)] for _ in range(500)])
+big_graph[0] = [1 for _ in range(500)]
+for i in range(len(big_graph)):
+    big_graph[i][0] = 1
+
+big_graph[0][0] = 0
+
 env_args = {'observables':MVC_OBSERVABLES,
                 'reward_signal':RewardSignal.BLS,
                 'extra_action':ExtraAction.NONE,
@@ -55,40 +64,25 @@ env_args = {'observables':MVC_OBSERVABLES,
                 'basin_reward':True,
                 'reversible_spins':True}
 
-network_fn = MPNN
-network_args = {
-    'n_layers': 3,
-    'n_features': 64,
-    'n_hid_readout': [],
-    'tied_weights': False
-}
-
 test_env = ising_env.make("SpinSystem",
                               SingleGraphGenerator(adjacency_matrix),
                               adjacency_matrix.shape[0]*2,
                               **env_args)
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-torch.device(device)
-print("Set torch default device to {}.".format(device))
+graphs = load_graph_set("_graphs/validation/ER_500spin_p15_100graphs.pkl")
+large_test_env = ising_env.make("SpinSystem",
+                                SingleGraphGenerator(graphs[0]),
+                                graphs[0].shape[0]*2,
+                                **env_args)
 
-network = network_fn(n_obs_in=test_env.observation_space.shape[1],
-                        **network_args).to(device)
+big_graph = ising_env.make("SpinSystem",
+                                SingleGraphGenerator(big_graph),
+                                big_graph.shape[0]*2,
+                                **env_args)
 
-# network.load_state_dict(torch.load('ER_20spin/eco/min_cover/network/network_best.pth',map_location=device))
-for param in network.parameters():
-    param.requires_grad = False
-network.eval()
-
-print("Sucessfully created agent with pre-trained MPNN.\nMPNN architecture\n\n{}".format(repr(network)))
-
-obs_batch = test_env.reset([-1] * test_env.n_spins)
-done = False
-while not done:
-    obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
-    action = predict(network, obs_batch, test_env.reversible_spins, test_env.get_allowed_action_states())[0]
-    obs, rew, done, info = test_env.step(action)
-    obs_batch = obs
+solver = CplexSolver(big_graph)
+solver.reset()
+solver.solve()                  
 
 
 graph = nx.Graph(adjacency_matrix)
