@@ -290,17 +290,14 @@ class CplexSolver(SpinSolver):
                         self._solver.add_constraint(variables[i] + variables[j] >= 1, 'x_{} + x_{} >= 1'.format(i, j))
 
             self._solver.minimize(self._solver.sum(variables))
+            self.measure = len(spins)
 
     def solve(self):
         self._solver.solve()
         self._solver.print_information()
         print(self._solver.solution)
 
-        solution = [0.0] * len(self.env.matrix)
-        for i, v in enumerate(self._solver.iter_integer_vars()):
-            # ROUNDING BECAUSE SOLUTION VALUE IS A FLOAT AND CAN HAVE ROUNDING ERROR
-            solution[i] = round(v.solution_value)
-        self.env.reset(2 * np.array(solution, dtype=np.int64) - 1)
+        self.measure = self._solver.objective_value
 
     def step(self, *args):
         """

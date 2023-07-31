@@ -183,6 +183,7 @@ def run(num_vertices, problem_type, graph_type, problem_params):
                                             **env_args)
             
 
+            # Using this for lower bounds, so the solution won't be the test environment's best seen
             print("Running CPLEX Solver")
             cplex_solver = CplexSolver(env=test_envs[0])
             cplex_solver.reset()
@@ -190,7 +191,7 @@ def run(num_vertices, problem_type, graph_type, problem_params):
             cplex_solver.solve()
             end = time.time()
 
-            cplex_batch.append(test_envs[0].best_solution)
+            cplex_batch.append(cplex_solver.measure)
             cplex_batch_time.append(end - start)
 
             # Next test cover matching (run 50 tests on each graph)
