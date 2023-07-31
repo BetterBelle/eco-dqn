@@ -321,21 +321,21 @@ def run(num_vertices, problem_type, graph_type, problem_params):
         solutions['neural_network_full_start_solutions'].append(neural_network_full_start_batch)
         solutions['neural_network_random_solutions'].append(neural_network_random_batch)
 
-        solutions['cplex_times'].append(cplex_batch_time)
-        solutions['cover_matching_times'].append(cover_matching_batch_time)
-        solutions['greedy_start_times'].append(greedy_start_batch_time)
-        solutions['greedy_random_times'].append(greedy_random_batch_time)
-        solutions['networkx_times'].append(networkx_batch_time)
-        solutions['neural_network_empty_start_times'].append(neural_network_empty_start_batch_time)
-        solutions['neural_network_full_start_times'].append(neural_network_full_start_batch_time)
-        solutions['neural_network_random_start_times'].append(neural_network_random_batch_time)
+        times['cplex_times'].append(cplex_batch_time)
+        times['cover_matching_times'].append(cover_matching_batch_time)
+        times['greedy_start_times'].append(greedy_start_batch_time)
+        times['greedy_random_times'].append(greedy_random_batch_time)
+        times['networkx_times'].append(networkx_batch_time)
+        times['neural_network_empty_start_times'].append(neural_network_empty_start_batch_time)
+        times['neural_network_full_start_times'].append(neural_network_full_start_batch_time)
+        times['neural_network_random_start_times'].append(neural_network_random_batch_time)
     
         # Print this data to file for every new batch to save partway through
         with open("test_data{}.txt".format(num_vertices), 'w') as f:
             f.write(str(solutions))
 
         with open("test_times{}.txt".format(num_vertices), 'w') as f:
-            f.write(str(solutions))
+            f.write(str(times))
 
 
 def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER', network_type='eco'):
