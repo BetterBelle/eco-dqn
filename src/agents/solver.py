@@ -290,7 +290,7 @@ class CplexSolver(SpinSolver):
                         self._solver.add_constraint(variables[i] + variables[j] >= 1, 'x_{} + x_{} >= 1'.format(i, j))
 
             self._solver.minimize(self._solver.sum(variables))
-            self.measure = len(spins)
+            self.measure = len(self.env.matrix)
 
     def solve(self):
         self._solver.solve()
