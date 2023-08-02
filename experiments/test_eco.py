@@ -86,6 +86,10 @@ def run(num_vertices, problem_type, graph_type, problem_params):
         for diff_vert_count in all_graphs:
             for i in range(len(diff_vert_count)):
                 diff_vert_count[i] = np.array(diff_vert_count[i] != 0, dtype=np.float64)
+
+# MAXIMUM INDEPENDENT SET
+# MAX DOM SET
+# CLIQUE
     
     
     ####################################################
