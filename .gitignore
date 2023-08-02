@@ -22,3 +22,4 @@ network[0-9]*.pth
 # Ignore data about test and training
 ER_[1-9]*spin
 test_data*
+test_times*.txt

@@ -12,6 +12,9 @@ width = 0.12
 with open('test_data20.txt') as f:
     solution_data : dict = eval(f.read())
 
+with open('test_times20.txt') as f:
+    solution_times : dict = eval(f.read())
+
 algorithms = list(solution_data.keys())
 
 # Want to get mean from every non-single graph test
@@ -20,7 +23,13 @@ for alg in solution_data:
     if type(solution_data[alg][0][0]) == list:
         for i in range(len(solution_data[alg])):
             for j in range(len(solution_data[alg][i])):
-                solution_data[alg][i][j] = int(np.mean(solution_data[alg][i][j]))
+                solution_data[alg][i][j] = np.mean(solution_data[alg][i][j])
+
+for alg in solution_times:
+    if type(solution_times[alg][0][0]) == list:
+        for i in range(len(solution_times[alg])):
+            for j in range(len(solution_times[alg][i])):
+                solution_times[alg][i][j] = np.mean(solution_times[alg][i][j])
 
 # Now we create approximation ratios with respect to the cplex solutions (always first in dict)
 for i in solution_data:
@@ -34,6 +43,10 @@ for alg in solution_data:
 for alg in solution_data:
     for i in range(len(solution_data[alg])):
         solution_data[alg][i] = np.mean(solution_data[alg][i])
+
+for alg in solution_times:
+    for i in range(len(solution_times[alg])):
+        solution_times[alg][i] = np.mean(solution_times[alg][i])
 
 bars = []
 plt.figure(figsize=(20, 10))
@@ -52,3 +65,26 @@ plt.title("Mean Cover Size by Algorithm on Validation Graphs (Erdős-Rényi; p=0
 plt.xticks(ind + width * len(solution_data) / 2, x)
 plt.legend(tuple(bars), tuple(algorithms))
 plt.savefig('test20.png')
+
+plt.figure().clear()
+plt.close()
+plt.cla()
+plt.clf()
+
+plt.figure(figsize=(20, 10))
+solution_times['neural_network_random_start_times'] = np.divide(solution_times['neural_network_random_start_times'], 50)
+
+for i, data in enumerate(solution_times):
+    bars.append(plt.bar(ind + width * i, solution_times[data], width))
+
+for i, alg in enumerate(solution_times):
+    for j in range(len(solution_times[alg])):
+        plt.text(j + i * width, solution_times[alg][j], round(solution_times[alg][j], 2), ha='center', fontsize=8)
+
+
+plt.xlabel("Validation Graph Size")
+plt.ylabel("Mean Time to Solve")
+plt.title("Mean Time to Solve by Algorithm on Validation Graphs (Erdős-Rényi; p=0.15)")
+plt.xticks(ind + width * len(solution_times) / 2, x)
+plt.legend(tuple(bars), tuple(algorithms))
+plt.savefig('test_times20.png')
