@@ -281,7 +281,7 @@ class CplexSolver(SpinSolver):
         ### Generate the problem parameters
         if self.env.optimisation_target == OptimisationTarget.MIN_COVER:
             self._solver = Model('Minimum Vertex Cover')
-            variables = self._solver.integer_var_list(len(self.env.matrix), 0, 1, 'x')
+            variables = self._solver.continuous_var_list(len(self.env.matrix), 0, 1, 'x')
 
             for i in range(len(self.env.matrix)):
                 # Don't double count edges, so start from index i in the row
@@ -290,17 +290,14 @@ class CplexSolver(SpinSolver):
                         self._solver.add_constraint(variables[i] + variables[j] >= 1, 'x_{} + x_{} >= 1'.format(i, j))
 
             self._solver.minimize(self._solver.sum(variables))
+            self.measure = len(self.env.matrix)
 
     def solve(self):
         self._solver.solve()
         self._solver.print_information()
         print(self._solver.solution)
 
-        solution = [0.0] * len(self.env.matrix)
-        for i, v in enumerate(self._solver.iter_integer_vars()):
-            # ROUNDING BECAUSE SOLUTION VALUE IS A FLOAT AND CAN HAVE ROUNDING ERROR
-            solution[i] = round(v.solution_value)
-        self.env.reset(2 * np.array(solution, dtype=np.int64) - 1)
+        self.measure = self._solver.objective_value
 
     def step(self, *args):
         """

@@ -2,6 +2,7 @@ import os
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
+import time
 
 import src.envs.core as ising_env
 from experiments.utils import test_network, load_graph_set
@@ -128,6 +129,16 @@ def run(num_vertices, problem_type, graph_type, problem_params):
         'neural_network_full_start_solutions': [],
         'neural_network_random_solutions': []
     }
+    times = {
+        'cplex_times': [],
+        'cover_matching_times': [],
+        'greedy_start_times': [],
+        'greedy_random_times': [],
+        'networkx_times': [],
+        'neural_network_empty_start_times': [],
+        'neural_network_full_start_times': [],
+        'neural_network_random_start_times': []
+    }
 
     test_envs : list[SpinSystemBase] = [None] * batch_size
 
@@ -140,6 +151,15 @@ def run(num_vertices, problem_type, graph_type, problem_params):
         neural_network_empty_start_batch = []
         neural_network_full_start_batch = []
         neural_network_random_batch = []
+
+        cplex_batch_time = []
+        cover_matching_batch_time = []
+        greedy_start_batch_time = []
+        greedy_random_batch_time = []
+        networkx_batch_time = []
+        neural_network_empty_start_batch_time = []
+        neural_network_full_start_batch_time = []
+        neural_network_random_batch_time = []
 
 
         for j, test_graph in enumerate(graphs):
@@ -167,65 +187,97 @@ def run(num_vertices, problem_type, graph_type, problem_params):
                                             **env_args)
             
 
+            # Using this for lower bounds, so the solution won't be the test environment's best seen
             print("Running CPLEX Solver")
             cplex_solver = CplexSolver(env=test_envs[0])
             cplex_solver.reset()
+            start = time.time()
             cplex_solver.solve()
-            cplex_batch.append(test_envs[0].best_solution)
+            end = time.time()
+
+            cplex_batch.append(cplex_solver.measure)
+            cplex_batch_time.append(end - start)
 
             # Next test cover matching (run 50 tests on each graph)
             print("Running Matching Algorithm")
             matching_solutions_batch = []
+            matching_time_batch = []
+
             for i in range(batch_size):
                 matching_solver = CoverMatching(env=test_envs[i])
                 matching_solver.reset()
+                start = time.time()
                 matching_solver.solve()
+                end = time.time()
+
                 matching_solutions_batch.append(test_envs[i].scorer.get_solution(test_envs[i].state[0, :test_envs[i].n_spins], test_envs[i].matrix))
+                matching_time_batch.append(end - start)
 
             cover_matching_batch.append(matching_solutions_batch)
+            cover_matching_batch_time.append(matching_time_batch)
 
             print("Running Greedy Algorithm from empty state")
             # Next test greedy allowing reversal from start state
             greedy_solver = Greedy(env=test_envs[0])
             greedy_solver.reset()
+            start = time.time()
             greedy_solver.solve()
+            end = time.time()
+
             greedy_start_batch.append(test_envs[0].best_solution)
+            greedy_start_batch_time.append(end - start)
 
             # Next test greedy allowing reversal from random state (run 50 tests on each graph)
             print("Running Greedy Algorithm from random state")
             greedy_random_sub_batch = []
+            greedy_random_time_sub_batch = []
+
             for i in range(batch_size):
                 greedy_solver = Greedy(env=test_envs[i])
                 greedy_solver.reset()
+                start = time.time()
                 greedy_solver.solve()
+                end = time.time()
+
                 greedy_random_sub_batch.append(test_envs[i].best_solution)
+                greedy_random_time_sub_batch.append(end - start)
 
             greedy_random_batch.append(greedy_random_sub_batch)
+            greedy_random_batch_time.append(greedy_random_time_sub_batch)
 
             print("Running NetworkX min_weighted_cover algorithm")
             # Next test networkx minimum weighted cover
             networkx_solver = NetworkXMinCoverSolver(env=test_envs[0])
             networkx_solver.reset()
+            start = time.time()
             networkx_solver.solve()
+            end = time.time()
+
             networkx_batch.append(test_envs[i].scorer.get_solution(test_envs[i].state[0, :test_envs[i].n_spins], test_envs[0].matrix))
+            networkx_batch_time.append(end - start)
 
             # Next test network from empty state
             # First reset the environment to be empty, getting the observations
             print("Running GECO on empty initial state.")
             obs_batch = test_envs[0].reset([-1] * test_envs[0].n_spins)
+            start = time.time()
             done = False
             while not done:
                 obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
                 action = predict(network, obs_batch, test_envs[0].reversible_spins, test_envs[0].get_allowed_action_states())[0]
                 obs, rew, done, info = test_envs[0].step(action)
                 obs_batch = obs
+            
+            end = time.time()
 
             # Once done, get best solution found
             neural_network_empty_start_batch.append(test_envs[0].best_solution)
+            neural_network_empty_start_batch_time.append(end - start)
 
             # Next test network from full state
             print("Running GECO on full initial state")
             obs_batch = test_envs[0].reset([1] * test_envs[0].n_spins)
+            start = time.time()
             done = False
             while not done:
                 obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
@@ -233,8 +285,11 @@ def run(num_vertices, problem_type, graph_type, problem_params):
                 obs, rew, done, info = test_envs[0].step(action)
                 obs_batch = obs
 
+            end = time.time()
+
             # Once done, get best solution found
             neural_network_full_start_batch.append(test_envs[0].best_solution)
+            neural_network_full_start_batch_time.append(end - start)
             
             # Next test network from random state (run 50 tests on each graph)
             print("Running GECO on random inital state.")
@@ -243,6 +298,8 @@ def run(num_vertices, problem_type, graph_type, problem_params):
             # Reset all the environments
             for env in test_envs:
                 obs_batch.append(env.reset())
+
+            start = time.time()
 
             while not done:
                 obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
@@ -254,8 +311,11 @@ def run(num_vertices, problem_type, graph_type, problem_params):
                     obs, rew, done, info = env.step(action)
                     obs_batch.append(obs)
 
+            end = time.time()
+
             # Once done, add a list of every best solution to the solutions array
             neural_network_random_batch.append([env.best_solution for env in test_envs])
+            neural_network_random_batch_time.append(end - start)
 
         solutions['cplex_solutions'].append(cplex_batch)
         solutions['cover_matching_solutions'].append(cover_matching_batch)
@@ -265,10 +325,22 @@ def run(num_vertices, problem_type, graph_type, problem_params):
         solutions['neural_network_empty_start_solutions'].append(neural_network_empty_start_batch)
         solutions['neural_network_full_start_solutions'].append(neural_network_full_start_batch)
         solutions['neural_network_random_solutions'].append(neural_network_random_batch)
+
+        times['cplex_times'].append(cplex_batch_time)
+        times['cover_matching_times'].append(cover_matching_batch_time)
+        times['greedy_start_times'].append(greedy_start_batch_time)
+        times['greedy_random_times'].append(greedy_random_batch_time)
+        times['networkx_times'].append(networkx_batch_time)
+        times['neural_network_empty_start_times'].append(neural_network_empty_start_batch_time)
+        times['neural_network_full_start_times'].append(neural_network_full_start_batch_time)
+        times['neural_network_random_start_times'].append(neural_network_random_batch_time)
     
         # Print this data to file for every new batch to save partway through
         with open("test_data{}.txt".format(num_vertices), 'w') as f:
             f.write(str(solutions))
+
+        with open("test_times{}.txt".format(num_vertices), 'w') as f:
+            f.write(str(times))
 
 
 def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER', network_type='eco'):
