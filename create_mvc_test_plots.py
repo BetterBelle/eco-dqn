@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-vert_counts = [20, 40, 60, 80, 100, 200]
+vert_counts = [20, 40, 60, 80, 100, 200, 500]
 
 
 x = ["|V| = {}".format(i) for i in vert_counts]
@@ -73,6 +73,13 @@ plt.clf()
 
 plt.figure(figsize=(20, 10))
 solution_times['neural_network_random_start_times'] = np.divide(solution_times['neural_network_random_start_times'], 50)
+
+for i in solution_times:
+    cplex_times = solution_times[i]
+    break
+
+for alg in solution_times:
+    solution_times[alg] = list(np.divide(solution_times[alg], cplex_times))
 
 for i, data in enumerate(solution_times):
     bars.append(plt.bar(ind + width * i, solution_times[data], width))
