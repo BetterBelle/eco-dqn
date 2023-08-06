@@ -224,31 +224,6 @@ class MinimumVertexCoverUnbiasedScorer(MinimizationProblem):
     def __init__(self, problem_type: OptimisationTarget, is_biased_graph: bool):
         super().__init__(problem_type, is_biased_graph)
     
-    @staticmethod
-    def _get_uncovered_edges(spins : ArrayLike, matrix : ArrayLike) -> float:
-        """
-        Gets the number of uncovered edges by the spins in the solution on the matrix
-        """
-        # np.array([spins == -1]) gives an array with 0s where there are nodes in the solution. Multiplying this and it's transpose
-        # by the matrix gives the matrix with only uncovered edges (counted twice, as it'll be bi-directional due to undirected graph)
-        # therefore sum and divide by two to get number of uncovered edges
-        
-        return np.sum(matrix * np.array([spins == -1]) * np.array([spins == -1]).T) / 2
-    
-    @staticmethod
-    def _get_newly_covered(spins : ArrayLike, matrix : ArrayLike) -> NDArray:
-        """
-        Gets the number of newly uncovered edges for each vertex flip. This value is positive if it increases the number of covered
-        edges.
-        """
-        # matrix * (spins == -1) gives a matrix but removing the edges incoming from any vertex in the solution on all vertices
-        # doing matrix multiplication with the spins gives you negative values, representing the number of edges not covered
-        # by a vertex in the solution (other than itself if it is in the solution) for each vertex, or 0 if there are no uncovered edges
-        # Therefore by multiplying this new array by the vertices themselves, you get how many edges get covered on flipping that 
-        # vertex, negative values indicating that it reduces the number of covered edges.
-        
-        return spins * op.matmul(matrix * np.array(spins == -1, dtype=np.float64), spins)
-    
     def set_max_local_reward(self, spins: ArrayLike, matrix: ArrayLike) -> None:
         """
         The max local reward is for normalizing the solution quality in the inputs. 
@@ -298,15 +273,24 @@ class MinimumVertexCoverUnbiasedScorer(MinimizationProblem):
         """
         The invalidity degree is the number of edges not covered by the solution. 
         """
-        return MinimumVertexCoverUnbiasedScorer._get_uncovered_edges(spins, matrix)
+        # np.array([spins == -1]) gives an array with 0s where there are nodes in the solution. Multiplying this and it's transpose
+        # by the matrix gives the matrix with only uncovered edges (counted twice, as it'll be bi-directional due to undirected graph)
+        # therefore sum and divide by two to get number of uncovered edges
+        return np.sum(matrix * np.array([spins == -1]) * np.array([spins == -1]).T) / 2
     
     def get_invalidity_degree_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
         """
         Invalidity degree mask is the change in validity degree for every vertex spin, positive if it increases the invalidity,
         negative if it decreases the invalidity (i.e. it makes it closer to a valid solution).
-        For the minimum vertex cover, this is the negative value for the number of newly covered edges
+        For the minimum vertex cover, this is the negative value for the number of newly covered edges.
         """
-        return -1 * MinimumVertexCoverUnbiasedScorer._get_newly_covered(spins, matrix)
+        # matrix * (spins == -1) gives a matrix but removing the edges incoming from any vertex in the solution on all vertices.
+        # Doing matrix multiplication with the spins gives you negative values, representing the number of edges not covered
+        # by a vertex in the solution (other than itself if it is in the solution) for each vertex, or 0 if there are no uncovered edges
+        # Therefore by multiplying this new array by the vertices themselves, you get how many edges get covered on flipping that 
+        # vertex, negative values indicating that it reduces the number of covered edges. For invalidity, positive values should decrease
+        # invalidity, so multiply by -1 for correct values.
+        return -1 * spins * op.matmul(matrix * np.array(spins == -1, dtype=np.float64), spins)
     
     def get_score_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
         """
@@ -476,6 +460,109 @@ class MinimumCutUnbiasedSolver(MinimizationProblem):
         Normalized score mask is the solution quality mask divided by the solution quality normalizer
         """
         return self.get_solution_quality_mask(spins, matrix) / self._solution_quality_normalizer
+    
+
+
+class MaximumIndependentSetUnbiasedSolver(MaximizationProblem):
+    def __init__(self, problem_type: OptimisationTarget, is_biased_graph: bool):
+        super().__init__(problem_type, is_biased_graph)
+
+    def set_invalidity_normalizer(self, spins: ArrayLike, matrix: ArrayLike) -> None:
+        """
+        Invalidity is measured the same way as the minimum vertex cover. Take the number of edges.
+        """
+        self._invalidity_normalizer = np.sum(matrix) / 2
+
+    def set_max_local_reward(self, spins: ArrayLike, matrix: ArrayLike) -> None:
+        """
+        Once again, the same as the minimum vertex cover. Take the maximum degree + the number of vertices in the graph.
+        """
+        self._max_local_reward = len(spins) + np.max(op.matmul(matrix * spins, spins))
+
+    def set_lower_bound(self, spins: ArrayLike, matrix: ArrayLike) -> None:
+        """
+        The lower bound for this problem is always 0 because it's based on the number of vertices which is never negative.
+        """
+        self._lower_bound = 0
+
+    def set_quality_normalizer(self, spins: ArrayLike, matrix: ArrayLike) -> None:
+        """
+        As the solution quality is based on the number of vertices in S, the maximum is the number of vertices in G.
+        """
+        self._solution_quality_normalizer = len(spins)
+
+    def get_solution(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Returns the number of vertices in the solution. If the solution is invalid, return all.
+        """
+        if not self.is_valid(spins, matrix):
+            return len(spins)
+        
+        return np.sum(spins == 1)
+    
+    def get_solution_quality_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
+        """
+        Seeing as it's a maximization problem, spins not in the solution (-1 state) should give a +1 quality and those in
+        (1 state) should give a -1 quality. This is just negative of the spins.
+        """
+        return - spins
+    
+    def get_invalidity_degree(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Calculating invalidity is similar to the vertex cover. By getting rid of all edges not covered by the solution,
+        we get the set of edges inside the solution set. Counting these gives the invalidity.
+        """
+
+        ### The spins == 1 gives an array with 0s in place of vertices not in the solution. By multiplying the matrix by this and 
+        ### the transpose, you get an adjacency matrix containing only the edges that connect vertices in the solution. Because
+        ### the graph is undirected and unweighted, all of these edges would be counted twice if you added them all up, so divide by two.
+        return np.sum(matrix * np.array([spins == 1]) * np.array([spins == 1]).T) / 2
+    
+    def get_invalidity_degree_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
+        """
+        Very similar calculation to the minimum vertex cover, but instead of counting edges that are not incident on a vertex in the solution,
+        we instead count edges that are incident on a vertex in the solution.
+        """
+
+        ### Where matrix * spins == -1 gave the edges that are not incident on the solution, matrix * spins == 1 gives the ones that are,
+        ### only counted once. By matrix multiplying with the spins themselves, you get the count of edges per vertex that connect it to
+        ### a vertex in the solution. By then multiplying normally by the spins, you get the negative change in the number of edges 
+        ### connected within the solution if that vertex is flipped. That is, positive if reducing the amount of interconnected edges in
+        ### the solution, and negative if increasing the amount of interconnecting edges.
+        ### Therefore, to get an invalidity degree, which is positive the worse the solution gets, we want to flip the sign, in order to get
+        ### increasing values for more edges contained within the solution set.
+        return -1 * spins * op.matmul(matrix * np.array(spins == 1, dtype=np.float64), spins)
+    
+    def get_score_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
+        """
+        The score mask is the change in score for every vertex flip. We therefore need to compute the new quality and invalidity degree
+        for each vertex flip. This is done identically to the Minimum Vertex Cover.
+        """
+
+        # Solution quality on each flip is just the current quality + the mask
+        # because solution quality ignores validity
+        updated_quality = self.get_solution_quality(spins, matrix) + self.get_solution_quality_mask(spins, matrix)
+        # Updated invalidity degree is just the current degree of invalidity + the mask
+        # this gives 0s for creating valid solutions
+        updated_invalidity = self.get_invalidity_degree(spins, matrix) + self.get_invalidity_degree_mask(spins, matrix)
+        scores = self.get_validity_mask(spins, matrix) * updated_quality - updated_invalidity
+        # Now we return the score on each vertex flip - the current score to get the update in score value on flip
+        return scores - self.get_score(spins, matrix)
+    
+    def get_normalized_score_mask(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Same calculations as the score mask, but normalizing the quality and invalidity.
+        """
+
+        updated_quality = self.get_solution_quality(spins, matrix) + self.get_solution_quality_mask(spins, matrix)
+        updated_quality /= self._solution_quality_normalizer
+
+        updated_invalidity = self.get_invalidity_degree(spins, matrix) + self.get_invalidity_degree_mask(spins, matrix)
+        updated_invalidity /= self._invalidity_normalizer
+
+        normalized_scores = self.get_validity_mask(spins, matrix) * updated_quality - updated_invalidity
+        # Now we return the score on each vertex flip - the current score to get the update in score value on flip
+        return normalized_scores - self.get_normalized_score(spins, matrix)
 
     
 
@@ -493,6 +580,9 @@ class ScoreSolverFactory():
         
         elif problem_type == env_utils.OptimisationTarget.MIN_CUT and not is_biased_graph:
             return MinimumCutUnbiasedSolver(problem_type, is_biased_graph)
+        
+        elif problem_type == env_utils.OptimisationTarget.MAX_IND_SET and not is_biased_graph:
+            return MaximumIndependentSetUnbiasedSolver(problem_type, is_biased_graph)
         
         # If make it here, invalid target
         raise NotImplementedError("Invalid optimization target: %s and biased %s", problem_type, is_biased_graph)

@@ -134,9 +134,6 @@ class SpinSystemBase():
         self.norm_rewards = norm_rewards
 
         self.n_actions = self.n_spins
-        # If the spin basis is numbered, that means it's a multiple subset problem and thus every node has 2 actions
-        if spin_basis == SpinBasis.NUMBERED:
-            self.n_actions *= 2
         
         if extra_action != ExtraAction.NONE:
             self.n_actions+=1

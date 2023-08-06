@@ -268,6 +268,15 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
+    elif problem_type == 'max_ind_set':
+        problem_params = {
+            'optimisation': OptimisationTarget.MAX_IND_SET,
+            'edge_type': EdgeType.UNIFORM,
+            'observables': DEFAULT_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1./num_vertices,
+            'reward_signal': RewardSignal.BLS
+        }
     else:
         print('Invalid problem type.')
         exit(1)
