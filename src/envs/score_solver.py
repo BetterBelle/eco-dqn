@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from numpy.typing import ArrayLike, NDArray
-from src.envs.utils import OptimisationTarget
-from numba import jit, float64
+from src.envs.utils import OptimisationTarget, calculate_cut, calculate_cut_changes
+from numba import jit
 
 import operator as op
 import src.envs.utils as env_utils
@@ -19,13 +19,14 @@ class ScoreSolver(ABC):
         self._max_local_reward = 1
         self._solution_quality_normalizer = 1
         self._invalidity_normalizer = 1
+        self._lower_bound = 0
 
     @abstractmethod
     def set_quality_normalizer(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
         """
         ABSTRACT 
 
-        This will normalize the quality for the normalized score.
+        This will normalize the quality for the normalized score. Doubles as an "upper bound" for solutions
         """
         raise NotImplementedError
 
@@ -44,6 +45,15 @@ class ScoreSolver(ABC):
         ABSTRACT 
 
         To normalize the invalidity degree
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_lower_bound(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
+        """
+        ABSTRACT
+
+        Setting a lower bound to shift measures for scores
         """
         raise NotImplementedError
     
@@ -114,19 +124,25 @@ class ScoreSolver(ABC):
         """
         raise NotImplementedError
     
+    @abstractmethod
     def get_score(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
         """
-        Get the score of the passed in spins. This is always just is_valid * quality - invalidity
+        ABSTRACT
+
+        Get the score of the passed in spins. This is always just is_valid * quality - invalidity.
+        Differs between max/min problems
         """
-        return self.is_valid(spins, matrix) * self.get_solution_quality(spins, matrix) - self.get_invalidity_degree(spins, matrix)
+        raise NotImplementedError
     
+    @abstractmethod
     def get_normalized_score(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
         """
-        Get the normalized score for the current spins. Always:
-        
-        is_valid * quality / quality_normalizer - invalidity / invalidity_normalizer
+        ABSTRACT
+
+        Get the normalized score of the passed in spins. This is always just is_valid * quality - invalidity.
+        Differs between max/min problems
         """
-        return self.is_valid(spins, matrix) * self.get_solution_quality(spins, matrix) / self._solution_quality_normalizer - self.get_invalidity_degree(spins, matrix) / self._invalidity_normalizer
+        raise NotImplementedError
     
     def get_validity_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> npt.NDArray:
         """
@@ -138,7 +154,6 @@ class ScoreSolver(ABC):
         new_validity_degree = self.get_invalidity_degree(spins, matrix) + self.get_invalidity_degree_mask(spins, matrix)
         return new_validity_degree == 0
 
-
     def is_valid(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> bool:
         """
         Determines whether the passed in spins are a valid solution.
@@ -148,7 +163,64 @@ class ScoreSolver(ABC):
     
 
 
-class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
+class MaximizationProblem(ScoreSolver):
+    """
+    Class template for a maximization problem
+    """
+    def __init__(self, problem_type: OptimisationTarget, is_biased_graph: bool):
+        super().__init__(problem_type, is_biased_graph)
+
+    def get_score(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Score is defined by is_valid * quality - invalidity
+
+        Quality being the measure score.
+        """
+        return self.is_valid(spins, matrix) * self.get_solution_quality(spins, matrix) - self.get_invalidity_degree(spins, matrix)
+
+    def get_normalized_score(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Normalizing the score. 
+        """
+        return self.is_valid(spins, matrix) * self.get_solution_quality(spins, matrix) / self._solution_quality_normalizer - self.get_invalidity_degree(spins, matrix) / self._invalidity_normalizer
+
+    def get_solution_quality(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Solution quality (or measure score) is always obtained the same for a maximization problem. measure + abs(min(0, LB))
+        """
+        return self.get_solution(spins, matrix) + abs(min(0, self._lower_bound))
+
+
+class MinimizationProblem(ScoreSolver):
+    """
+    Class template for a minimization problem
+    """
+    def __init__(self, problem_type: OptimisationTarget, is_biased_graph: bool):
+        super().__init__(problem_type, is_biased_graph)
+
+    def get_score(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Score is defined by is_valid * quality - invalidity
+
+        Quality being the measure score.
+        """
+        return self.is_valid(spins, matrix) * (self.get_solution_quality(spins, matrix) + max(0, self._solution_quality_normalizer)) - self.get_invalidity_degree(spins, matrix)
+
+    def get_normalized_score(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Normalizing the score. 
+        """
+        return self.is_valid(spins, matrix) * (self.get_solution_quality(spins, matrix) + max(0, self._solution_quality_normalizer)) / self._solution_quality_normalizer - self.get_invalidity_degree(spins, matrix) / self._invalidity_normalizer
+
+    def get_solution_quality(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Solution quality (or measure score) is always obtained the same for a minimization problem. - measure + max(0, UB))
+        """
+        return max(0, self._solution_quality_normalizer) - self.get_solution(spins, matrix)
+
+
+
+class MinimumVertexCoverUnbiasedScorer(MinimizationProblem):
     def __init__(self, problem_type: OptimisationTarget, is_biased_graph: bool):
         super().__init__(problem_type, is_biased_graph)
     
@@ -201,6 +273,9 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         """
         self._solution_quality_normalizer = len(spins)
 
+    def set_lower_bound(self, spins: ArrayLike, matrix: ArrayLike) -> None:
+        self._lower_bound = 0
+
     def get_solution(self, spins: ArrayLike, matrix: ArrayLike) -> float:
         """
         The solution for the minimum vertex cover is just the size of the solution set. So sum of spins == 1.
@@ -218,13 +293,6 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         vertices themselves. -1 for adding a node to the solution, +1 for removing it.
         """
         return spins
-    
-    def get_solution_quality(self, spins: ArrayLike, matrix: ArrayLike) -> float:
-        """
-        For minimum vertex cover, solution quality is just the number of vertices not in the solution. Reason we do this is to
-        attribute higher scores to smaller solution sets.
-        """
-        return np.sum(spins == -1)
     
     def get_invalidity_degree(self, spins: ArrayLike, matrix: ArrayLike) -> float:
         """
@@ -270,28 +338,12 @@ class MinimumVertexCoverUnbiasedScorer(ScoreSolver):
         normalized_scores = self.get_validity_mask(spins, matrix) * updated_quality - updated_invalidity
         # Now we return the score on each vertex flip - the current score to get the update in score value on flip
         return normalized_scores - self.get_normalized_score(spins, matrix)
-        
 
 
-class MinimumVertexCoverBiasedScorer(ScoreSolver):
+
+class MaximumCutUnbiasedScorer(MaximizationProblem):
     def __init__(self, problem_type, is_biased_graph):
         super().__init__(problem_type, is_biased_graph)
-        raise NotImplementedError("This optimizer is not implemented : %s", problem_type)
-
-
-
-class MaximumCutUnbiasedScorer(ScoreSolver):
-    def __init__(self, problem_type, is_biased_graph):
-        super().__init__(problem_type, is_biased_graph)
-
-    ### Following methods are private static jit methods for speedup
-    @staticmethod
-    @jit(nopython=True)
-    def _solution_quality_mask_calculator(spins : ArrayLike, matrix: ArrayLike) -> NDArray:
-        """
-        Quick computation of the quality mask
-        """
-        return spins * op.matmul(matrix, spins)
 
     def set_invalidity_normalizer(self, spins: ArrayLike, matrix: ArrayLike) -> None:
         """
@@ -301,15 +353,15 @@ class MaximumCutUnbiasedScorer(ScoreSolver):
 
     def set_quality_normalizer(self, spins: ArrayLike, matrix: ArrayLike) -> None:
         """
-        Quality normalizer is the number of vertices for the maximum cut. 
+        The total weight of positive vertex weights. In case of all negative weights, set to 1.
         """
-        self._solution_quality_normalizer = len(spins)
+        self._solution_quality_normalizer = max(1, np.sum(np.multiply(matrix, (matrix > 0))))
 
     def set_max_local_reward(self, spins: ArrayLike, matrix: ArrayLike) -> None:
         """
-        For the maximum cut, the maximum local reward is the maximum immediate reward from the empty set (i.e. the highest weight
-        on any node). This is just calling the solution quality mask with an empty (all -1) solution set. Can also be the score mask,
-        but that just results in more function calls as the score is just the quality due to having no 
+        For the maximum cut, the maximum local reward is the maximum immediate reward from the empty set 
+        (i.e. the highest weight on any node). This is just calling the solution quality mask with an empty 
+        (all -1) solution set. 
         """
         quality_mask = self.get_solution_quality_mask(np.array([-1] * len(spins), dtype=np.float64), matrix)
         without_zeros = quality_mask[np.nonzero(quality_mask)]
@@ -319,20 +371,14 @@ class MaximumCutUnbiasedScorer(ScoreSolver):
         """
         For any cut problem, the solution is just the quality of a maximum cut, i.e. the cut value
         """
-        return (1/4) * np.sum(np.multiply(matrix, 1 - np.outer(spins, spins)))
+        return calculate_cut(spins, matrix)
 
     def get_solution_quality_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
         """
         For the maximum cut, this will be the change in cut value
         for each spin flip compared to the passed spins.
         """
-        return MaximumCutUnbiasedScorer._solution_quality_mask_calculator(spins, matrix)
-    
-    def get_solution_quality(self, spins: ArrayLike, matrix: ArrayLike) -> float:
-        """
-        Solution quality here is just the cut value
-        """
-        return (1/4) * np.sum(np.multiply(matrix, 1 - np.outer(spins, spins)))
+        return calculate_cut_changes(spins, matrix)
 
     def get_invalidity_degree(self, spins: ArrayLike, matrix: ArrayLike) -> float:
         """
@@ -358,50 +404,80 @@ class MaximumCutUnbiasedScorer(ScoreSolver):
         For max cut, normalized score mask is the solution quality mask divided by the solution quality normalizer
         """
         return self.get_solution_quality_mask(spins, matrix) / self._solution_quality_normalizer
-    
-
-
-class MaximumCutBiasedScorer(ScoreSolver):
-    def __init__(self, problem_type, is_biased_graph):
-        super().__init__(problem_type, is_biased_graph)
-        raise NotImplementedError("This optimizer is not implemented : %s", problem_type)
 
 
 
-class EnergyUnbiasedScorer(ScoreSolver):
-    def __init__(self, problem_type, is_biased_graph):
-        super().__init__(problem_type, is_biased_graph)
-        raise NotImplementedError("This optimizer is not implemented : %s", problem_type)
-
-
-
-class EnergyBiasedScorer(ScoreSolver):
-    def __init__(self, problem_type, is_biased_graph):
-        super().__init__(problem_type, is_biased_graph)
-        raise NotImplementedError("This optimizer is not implemented : %s", problem_type)
-
-
-
-class MinimumCutUnbiasedSolver(MaximumCutUnbiasedScorer):
+class MinimumCutUnbiasedSolver(MinimizationProblem):
     """
     The minimum cut requires all the same calculations as the maximum cut, so we'll just make it inherit and call super, then we 
     just flip the sign for all the scores to make it minimize instead of maximize. We can do this for basically any other problem.
+    
+    Because there's no invalidity, won't worry about offsets or anything like that.
     """
     def __init__(self, problem_type: OptimisationTarget, is_biased_graph: bool):
         super().__init__(problem_type, is_biased_graph)
 
+    def set_invalidity_normalizer(self, spins: ArrayLike, matrix: ArrayLike) -> None:
+        """
+        Minimum cut does not need this so we just set it to 1
+        """
+        self._invalidity_normalizer = 1
+
+    def set_quality_normalizer(self, spins: ArrayLike, matrix: ArrayLike) -> None:
+        """
+        The absolute total weight of negative vertex weights. In case of all positive weights, set to 1.
+        """
+        self._solution_quality_normalizer = max(1, abs(np.sum(np.multiply(matrix, (matrix < 0)))))
+
+    def set_max_local_reward(self, spins: ArrayLike, matrix: ArrayLike) -> None:
+        """
+        For the minimum cut, the maximum local reward is the maximum immediate reward from the empty set 
+        (i.e. the highest negative on any node). This is just calling the solution quality mask with an empty 
+        (all -1) solution set. 
+        """
+        quality_mask = self.get_solution_quality_mask(np.array([-1] * len(spins), dtype=np.float64), matrix)
+        without_zeros = quality_mask[np.nonzero(quality_mask)]
+        self._max_local_reward = np.max(without_zeros)
+    
+    def get_solution(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        For any cut problem, the solution is just the quality of a maximum cut, i.e. the cut value
+        """
+        return calculate_cut(spins, matrix)
+
     def get_solution_quality_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
         """
-        For the minimum cut, it's the same quality mask as the maximum but with signs flipped.
+        For the minimum cut, this will be the change in cut value for each spin flip compared to the passed spins, 
+        but negative, because we want an increase for negative cut changes.
         """
-        return -1 * super().get_solution_quality_mask(spins, matrix)
-    
-    def get_solution_quality(self, spins: ArrayLike, matrix: ArrayLike) -> float:
-        """
-        Solution quality for the minimization is still just the cut value like max cut, but negative
-        """
-        return -1 * super().get_solution_quality(spins, matrix)
+        return - calculate_cut_changes(spins, matrix)
 
+    def get_invalidity_degree(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        There is no such thing as an invalid solution for the min cut.
+        Therefore we just set the invalidity degree to 0.
+        """
+        return 0
+    
+    def get_invalidity_degree_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
+        """
+        All min cut solutions are valid. Therefore the invalidity degree is all 0s.
+        """
+        return [0 for _ in range(len(spins))]
+    
+    def get_score_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
+        """
+        Score mask for the case of minimum cut is the same as the solution quality mask.
+        """
+        return self.get_solution_quality_mask(spins, matrix)
+    
+    def get_normalized_score_mask(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Normalized score mask is the solution quality mask divided by the solution quality normalizer
+        """
+        return self.get_solution_quality_mask(spins, matrix) / self._solution_quality_normalizer
+
+    
 
 class ScoreSolverFactory():
     @staticmethod
@@ -412,20 +488,8 @@ class ScoreSolverFactory():
         if problem_type == env_utils.OptimisationTarget.CUT and not is_biased_graph:
             return MaximumCutUnbiasedScorer(problem_type, is_biased_graph)
         
-        elif problem_type == env_utils.OptimisationTarget.CUT and is_biased_graph:
-            return MaximumCutUnbiasedScorer(problem_type, is_biased_graph)
-        
         elif problem_type == env_utils.OptimisationTarget.MIN_COVER and not is_biased_graph:
             return MinimumVertexCoverUnbiasedScorer(problem_type, is_biased_graph)
-        
-        elif problem_type == env_utils.OptimisationTarget.MIN_COVER and is_biased_graph:
-            return MinimumVertexCoverBiasedScorer(problem_type, is_biased_graph)
-        
-        elif problem_type == env_utils.OptimisationTarget.ENERGY and not is_biased_graph:
-            return EnergyUnbiasedScorer(problem_type, is_biased_graph)
-        
-        elif problem_type == env_utils.OptimisationTarget.ENERGY and is_biased_graph:
-            return EnergyBiasedScorer(problem_type, is_biased_graph)
         
         elif problem_type == env_utils.OptimisationTarget.MIN_CUT and not is_biased_graph:
             return MinimumCutUnbiasedSolver(problem_type, is_biased_graph)

@@ -214,6 +214,7 @@ class SpinSystemBase():
         # Now we have a state and we know the graph is valid, set the normalizers for the scorer
         self.scorer.set_invalidity_normalizer(self.state[0, :self.n_spins], self.matrix)
         self.scorer.set_quality_normalizer(self.state[0, :self.n_spins], self.matrix)
+        self.scorer.set_lower_bound(self.state[0, :self.n_spins], self.matrix)
 
         # Set the score and normalized score
         self.score = self.scorer.get_score(self.state[0, :self.n_spins], self.matrix)

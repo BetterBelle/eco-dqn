@@ -4,6 +4,8 @@ from enum import Enum
 
 import networkx as nx
 import numpy as np
+import operator as op
+from numba import jit
 
 class EdgeType(Enum):
 
@@ -30,12 +32,12 @@ class OptimisationTarget(Enum):
     ENERGY = 2
     MIN_COVER = 3
     MIN_CUT = 4
+    MAX_IND_SET = 5
 
 class SpinBasis(Enum):
 
     SIGNED = 1
     BINARY = 2
-    NUMBERED = 3
 
 class Observable(Enum):
     # Local observations that differ between nodes.
@@ -43,11 +45,6 @@ class Observable(Enum):
     IMMEDIATE_QUALITY_CHANGE = 2 # The immediate quality change on vertex flip
     IMMEDIATE_VALIDITY_DIFFERENCE = 3 # Immediate change in how much closer to a valid candidate the current state is on flip
     IMMEDIATE_VALIDITY_CHANGE = 4 # Whether the solution becomes valid on flip
-
-    # Doubled observations for local observations. These are for moving vertices "backwards" in the list
-    ALT_IMMEDIATE_QUALITY_CHANGE = 14
-    ALT_IMMEDIATE_VALIDITY_DIFFERENCE = 15
-    ALT_IMMEDIATE_VALIDITY_CHANGE = 16
 
     # This is an exception to the doubled observations
     TIME_SINCE_FLIP = 5 # The number of steps since the vertex was changed
@@ -98,22 +95,19 @@ MVC_OBSERVABLES = [Observable.SPIN_STATE,
                    Observable.GLOBAL_VALIDITY_DIFFERENCE,
                    Observable.VALIDITY_BIT]
 
-BIG_OBSERVABLES = [ Observable.SPIN_STATE,
-                    Observable.IMMEDIATE_QUALITY_CHANGE,
-                    Observable.IMMEDIATE_VALIDITY_DIFFERENCE,
-                    Observable.IMMEDIATE_VALIDITY_CHANGE,
-                    Observable.TIME_SINCE_FLIP,
-                    Observable.EPISODE_TIME,
-                    Observable.TERMINATION_IMMANENCY,
-                    Observable.NUMBER_OF_QUALITY_IMPROVEMENTS,
-                    Observable.NUMBER_OF_VALIDITY_IMPROVEMENTS,
-                    Observable.DISTANCE_FROM_BEST_SOLUTION,
-                    Observable.DISTANCE_FROM_BEST_STATE,
-                    Observable.GLOBAL_VALIDITY_DIFFERENCE,
-                    Observable.VALIDITY_BIT,
-                    Observable.ALT_IMMEDIATE_QUALITY_CHANGE,
-                    Observable.ALT_IMMEDIATE_VALIDITY_DIFFERENCE,
-                    Observable.ALT_IMMEDIATE_VALIDITY_CHANGE]
+def calculate_cut(spins, matrix):
+    """
+    Calculate the cut based on the spins and matrix
+    """
+    return (1/4) * np.sum(np.multiply(matrix, 1 - np.outer(spins, spins)))
+
+
+@jit(nopython=True)
+def calculate_cut_changes(spins, matrix):
+    """
+    More efficient way to calculate immediate cut changes.
+    """
+    return spins * op.matmul(matrix, spins)
 
 
 class GraphGenerator(ABC):
