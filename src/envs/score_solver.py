@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from numpy.typing import ArrayLike, NDArray
 from src.envs.utils import OptimisationTarget, calculate_cut, calculate_cut_changes
-from numba import jit
 
 import operator as op
 import src.envs.utils as env_utils
@@ -496,7 +495,7 @@ class MaximumIndependentSetUnbiasedSolver(MaximizationProblem):
         Returns the number of vertices in the solution. If the solution is invalid, return all.
         """
         if not self.is_valid(spins, matrix):
-            return len(spins)
+            return 0
         
         return np.sum(spins == 1)
     
@@ -531,7 +530,7 @@ class MaximumIndependentSetUnbiasedSolver(MaximizationProblem):
         ### the solution, and negative if increasing the amount of interconnecting edges.
         ### Therefore, to get an invalidity degree, which is positive the worse the solution gets, we want to flip the sign, in order to get
         ### increasing values for more edges contained within the solution set.
-        return -1 * spins * op.matmul(matrix * np.array(spins == 1, dtype=np.float64), spins)
+        return - spins * op.matmul(matrix * np.array(spins == 1, dtype=np.float64), spins)
     
     def get_score_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
         """

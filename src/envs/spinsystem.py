@@ -1,10 +1,8 @@
-from abc import ABC, abstractmethod
 from collections import namedtuple
-from operator import matmul
 
 import numpy as np
-import torch.multiprocessing as mp
-from numba import jit, float64, int64
+# import networkx as nx
+# import matplotlib.pyplot as plt
 
 from src.envs.score_solver import ScoreSolverFactory
 from src.envs.utils import (EdgeType,
@@ -218,6 +216,9 @@ class SpinSystemBase():
         self.normalized_score = self.scorer.get_normalized_score(self.state[0, :self.n_spins], self.matrix)
         self.solution = self.scorer.get_solution(self.state[0, :self.n_spins], self.matrix)
 
+        # nx.draw_networkx(nx.Graph(self.matrix))
+        # plt.show()
+
         if self.reward_signal == RewardSignal.SINGLE:
             self.init_score = self.score
             self.init_score_normalized = self.normalized_score
@@ -424,6 +425,8 @@ class SpinSystemBase():
         # elif self.reward_signal == RewardSignal.SINGLE and done:
         #     rew = self.score - self.init_score
         ###
+        # nx.draw_networkx(nx.Graph(self.matrix))
+        # plt.show()
 
         if self.stag_punishment is not None or self.basin_reward is not None:
             visiting_new_state = self.history_buffer.update(action)
