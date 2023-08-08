@@ -67,6 +67,16 @@ class ScoreSolver(ABC):
         raise NotImplementedError
     
     @abstractmethod
+    def _get_measure(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
+        """
+        ABSTRACT
+
+        Gets the measure of the solution without accounting for validity. Only for use
+        in calculating score.
+        """
+        raise NotImplementedError
+    
+    @abstractmethod
     def get_solution_quality_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> npt.NDArray:
         """
         ABSTRACT 
@@ -187,7 +197,7 @@ class MaximizationProblem(ScoreSolver):
         """
         Solution quality (or measure score) is always obtained the same for a maximization problem. measure + abs(min(0, LB))
         """
-        return self.get_solution(spins, matrix) + abs(min(0, self._lower_bound))
+        return self._get_measure(spins, matrix) + abs(min(0, self._lower_bound))
 
 
 class MinimizationProblem(ScoreSolver):
@@ -203,19 +213,19 @@ class MinimizationProblem(ScoreSolver):
 
         Quality being the measure score.
         """
-        return self.is_valid(spins, matrix) * (self.get_solution_quality(spins, matrix) + max(0, self._solution_quality_normalizer)) - self.get_invalidity_degree(spins, matrix)
+        return self.is_valid(spins, matrix) * self.get_solution_quality(spins, matrix) - self.get_invalidity_degree(spins, matrix)
 
     def get_normalized_score(self, spins: ArrayLike, matrix: ArrayLike) -> float:
         """
         Normalizing the score. 
         """
-        return self.is_valid(spins, matrix) * (self.get_solution_quality(spins, matrix) + max(0, self._solution_quality_normalizer)) / self._solution_quality_normalizer - self.get_invalidity_degree(spins, matrix) / self._invalidity_normalizer
+        return self.is_valid(spins, matrix) * self.get_solution_quality(spins, matrix) / self._solution_quality_normalizer - self.get_invalidity_degree(spins, matrix) / self._invalidity_normalizer
 
     def get_solution_quality(self, spins: ArrayLike, matrix: ArrayLike) -> float:
         """
         Solution quality (or measure score) is always obtained the same for a minimization problem. - measure + max(0, UB))
         """
-        return max(0, self._solution_quality_normalizer) - self.get_solution(spins, matrix)
+        return max(0, self._solution_quality_normalizer) - self._get_measure(spins, matrix)
 
 
 
@@ -258,6 +268,12 @@ class MinimumVertexCoverUnbiasedScorer(MinimizationProblem):
         if not self.is_valid(spins, matrix):
             return len(spins)
         
+        return np.sum(spins == 1)
+    
+    def _get_measure(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Same thing as solution but ignoring validity.
+        """
         return np.sum(spins == 1)
 
     def get_solution_quality_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
@@ -355,6 +371,12 @@ class MaximumCutUnbiasedScorer(MaximizationProblem):
         For any cut problem, the solution is just the quality of a maximum cut, i.e. the cut value
         """
         return calculate_cut(spins, matrix)
+    
+    def _get_measure(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        No validity with max cut, so just return the solution.
+        """
+        return self.get_solution(spins, matrix)
 
     def get_solution_quality_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
         """
@@ -427,6 +449,12 @@ class MinimumCutUnbiasedSolver(MinimizationProblem):
         For any cut problem, the solution is just the quality of a maximum cut, i.e. the cut value
         """
         return calculate_cut(spins, matrix)
+    
+    def _get_measure(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        No validity with min cut, so just return the solution.
+        """
+        return self.get_solution(spins, matrix)
 
     def get_solution_quality_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
         """
@@ -492,7 +520,7 @@ class MaximumIndependentSetUnbiasedSolver(MaximizationProblem):
 
     def get_solution(self, spins: ArrayLike, matrix: ArrayLike) -> float:
         """
-        Returns the number of vertices in the solution. If the solution is invalid, return all.
+        Returns the number of vertices in the solution. If the solution is invalid, return none.
         """
         if not self.is_valid(spins, matrix):
             return 0
