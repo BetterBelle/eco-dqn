@@ -12,7 +12,7 @@ from src.envs.utils import (SingleGraphGenerator,
                             MVC_OBSERVABLES, EdgeType, DEFAULT_OBSERVABLES,
                             Observable)
 from src.networks.mpnn import MPNN
-from src.agents.solver import CplexSolver, CoverMatching, NetworkXMinCoverSolver, Greedy
+from src.agents.solver import *
 from src.envs.spinsystem import SpinSystemBase
 
 try:
@@ -21,7 +21,7 @@ try:
 except ImportError:
     pass
 
-def run(num_vertices, problem_type, graph_type, problem_params):
+def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms : list[SpinSolver], random_algorithms : list[SpinSolver], stepped_algorithms : list[SpinSolver]):
     
     save_loc = '{}_{}spin/eco/{}'.format(graph_type, num_vertices, problem_type)
 
@@ -88,10 +88,8 @@ def run(num_vertices, problem_type, graph_type, problem_params):
             for i in range(len(diff_vert_count)):
                 diff_vert_count[i] = np.array(diff_vert_count[i] != 0, dtype=np.float64)
 
-# MAXIMUM INDEPENDENT SET
 # MAX DOM SET
 # CLIQUE
-    
     
     ####################################################
     # SETUP NETWORK TO TEST
@@ -117,50 +115,35 @@ def run(num_vertices, problem_type, graph_type, problem_params):
     print("Sucessfully created agent with pre-trained MPNN.\nMPNN architecture\n\n{}".format(repr(network)))
 
     ### SETUP TESTS
+    ### Forcing cplex to be the first because it's fixed
+    solutions = {}
+    times = {}
 
     batch_size = 50
-    solutions = {
-        'cplex_solutions': [],
-        'cover_matching_solutions': [],
-        'greedy_start_solutions': [],
-        'greedy_random_solutions': [],
-        'networkx_solutions': [],
-        'neural_network_empty_start_solutions': [],
-        'neural_network_full_start_solutions': [],
-        'neural_network_random_solutions': []
-    }
-    times = {
-        'cplex_times': [],
-        'cover_matching_times': [],
-        'greedy_start_times': [],
-        'greedy_random_times': [],
-        'networkx_times': [],
-        'neural_network_empty_start_times': [],
-        'neural_network_full_start_times': [],
-        'neural_network_random_start_times': []
-    }
+    for algorithm in fixed_algorithms + random_algorithms:
+        solutions['{}'.format(algorithm.name)] = []
+        times['{}'.format(algorithm.name)] = []
+
+    for algorithm in stepped_algorithms:
+        solutions['{} empty start'.format(algorithm.name)] = []
+        solutions['{} full start'.format(algorithm.name)] = []
+        times['{} empty start'.format(algorithm.name)] = []
+        times['{} full start'.format(algorithm.name)] = []
+
+    solutions['neural network empty'] = []
+    solutions['neural network full'] = []
+    solutions['neural network random'] = []
+    times['neural network empty'] = []
+    times['neural network full'] = []
+    times['neural network random'] = []
 
     test_envs : list[SpinSystemBase] = [None] * batch_size
 
     for i, graphs in enumerate(all_graphs):
-        cplex_batch = []
-        cover_matching_batch = []
-        greedy_start_batch = []
-        greedy_random_batch = []
-        networkx_batch = []
-        neural_network_empty_start_batch = []
-        neural_network_full_start_batch = []
-        neural_network_random_batch = []
-
-        cplex_batch_time = []
-        cover_matching_batch_time = []
-        greedy_start_batch_time = []
-        greedy_random_batch_time = []
-        networkx_batch_time = []
-        neural_network_empty_start_batch_time = []
-        neural_network_full_start_batch_time = []
-        neural_network_random_batch_time = []
-
+        # append batches
+        for algorithm in solutions:
+            solutions[algorithm].append([])
+            times[algorithm].append([])
 
         for j, test_graph in enumerate(graphs):
             env_args = {
@@ -186,75 +169,48 @@ def run(num_vertices, problem_type, graph_type, problem_params):
                                             test_graph.shape[0]*step_factor,
                                             **env_args)
             
-
-            # Using this for lower bounds, so the solution won't be the test environment's best seen
-            print("Running CPLEX Solver")
-            cplex_solver = CplexSolver(env=test_envs[0])
-            cplex_solver.reset()
-            start = time.time()
-            cplex_solver.solve()
-            end = time.time()
-
-            cplex_batch.append(cplex_solver.measure)
-            cplex_batch_time.append(end - start)
-
-            # Next test cover matching (run 50 tests on each graph)
-            print("Running Matching Algorithm")
-            matching_solutions_batch = []
-            matching_time_batch = []
-
-            for i in range(batch_size):
-                matching_solver = CoverMatching(env=test_envs[i])
-                matching_solver.reset()
+            for algorithm in fixed_algorithms:
+                algorithm.set_env(test_envs[0])
+                algorithm.reset()
                 start = time.time()
-                matching_solver.solve()
+                algorithm.solve()
+                end = time.time()
+                solutions[algorithm.name][-1].append(algorithm.measure)
+                times[algorithm.name][-1].append(end - start)
+
+            for algorithm in stepped_algorithms:
+                # empty start
+                algorithm.set_env(test_envs[0])
+                algorithm.reset([-1] * test_envs[0].n_spins)
+                start = time.time()
+                algorithm.solve()
                 end = time.time()
 
-                matching_solutions_batch.append(test_envs[i].scorer.get_solution(test_envs[i].state[0, :test_envs[i].n_spins], test_envs[i].matrix))
-                matching_time_batch.append(end - start)
-
-            cover_matching_batch.append(matching_solutions_batch)
-            cover_matching_batch_time.append(matching_time_batch)
-
-            print("Running Greedy Algorithm from empty state")
-            # Next test greedy allowing reversal from start state
-            greedy_solver = Greedy(env=test_envs[0])
-            greedy_solver.reset()
-            start = time.time()
-            greedy_solver.solve()
-            end = time.time()
-
-            greedy_start_batch.append(test_envs[0].best_solution)
-            greedy_start_batch_time.append(end - start)
-
-            # Next test greedy allowing reversal from random state (run 50 tests on each graph)
-            print("Running Greedy Algorithm from random state")
-            greedy_random_sub_batch = []
-            greedy_random_time_sub_batch = []
-
-            for i in range(batch_size):
-                greedy_solver = Greedy(env=test_envs[i])
-                greedy_solver.reset()
+                solutions['{} empty start'.format(algorithm.name)][-1].append(algorithm.measure)
+                times['{} empty start'.format(algorithm.name)][-1].append(end - start)
+                
+                algorithm.reset([1] * test_envs[0].n_spins)
                 start = time.time()
-                greedy_solver.solve()
+                algorithm.solve()
                 end = time.time()
 
-                greedy_random_sub_batch.append(test_envs[i].best_solution)
-                greedy_random_time_sub_batch.append(end - start)
+                solutions['{} full start'.format(algorithm.name)][-1].append(algorithm.measure)
+                times['{} full start'.format(algorithm.name)][-1].append(end - start)
 
-            greedy_random_batch.append(greedy_random_sub_batch)
-            greedy_random_batch_time.append(greedy_random_time_sub_batch)
+            for algorithm in random_algorithms:
+                # setup sub-batches for randomized algorithms
+                solutions[algorithm.name][-1].append([])
+                times[algorithm.name][-1].append([])
 
-            print("Running NetworkX min_weighted_cover algorithm")
-            # Next test networkx minimum weighted cover
-            networkx_solver = NetworkXMinCoverSolver(env=test_envs[0])
-            networkx_solver.reset()
-            start = time.time()
-            networkx_solver.solve()
-            end = time.time()
+                for i in range(batch_size):
+                    algorithm.set_env(test_envs[i])
+                    algorithm.reset()
+                    start = time.time()
+                    algorithm.solve()
+                    end = time.time()
 
-            networkx_batch.append(test_envs[i].scorer.get_solution(test_envs[i].state[0, :test_envs[i].n_spins], test_envs[0].matrix))
-            networkx_batch_time.append(end - start)
+                    solutions[algorithm.name][-1][-1].append(algorithm.measure)
+                    times[algorithm.name][-1][-1].append(end - start)
 
             # Next test network from empty state
             # First reset the environment to be empty, getting the observations
@@ -270,9 +226,9 @@ def run(num_vertices, problem_type, graph_type, problem_params):
             
             end = time.time()
 
-            # Once done, get best solution found
-            neural_network_empty_start_batch.append(test_envs[0].best_solution)
-            neural_network_empty_start_batch_time.append(end - start)
+            # Once done, get best solution found into the batch
+            solutions['neural network empty'][-1].append(test_envs[0].best_solution)
+            times['neural network empty'][-1].append(end - start)
 
             # Next test network from full state
             print("Running GECO on full initial state")
@@ -288,8 +244,8 @@ def run(num_vertices, problem_type, graph_type, problem_params):
             end = time.time()
 
             # Once done, get best solution found
-            neural_network_full_start_batch.append(test_envs[0].best_solution)
-            neural_network_full_start_batch_time.append(end - start)
+            solutions['neural network full'][-1].append(test_envs[0].best_solution)
+            times['neural network full'][-1].append(end - start)
             
             # Next test network from random state (run 50 tests on each graph)
             print("Running GECO on random inital state.")
@@ -314,32 +270,14 @@ def run(num_vertices, problem_type, graph_type, problem_params):
             end = time.time()
 
             # Once done, add a list of every best solution to the solutions array
-            neural_network_random_batch.append([env.best_solution for env in test_envs])
-            neural_network_random_batch_time.append(end - start)
-
-        solutions['cplex_solutions'].append(cplex_batch)
-        solutions['cover_matching_solutions'].append(cover_matching_batch)
-        solutions['greedy_start_solutions'].append(greedy_start_batch)
-        solutions['greedy_random_solutions'].append(greedy_random_batch)
-        solutions['networkx_solutions'].append(networkx_batch)
-        solutions['neural_network_empty_start_solutions'].append(neural_network_empty_start_batch)
-        solutions['neural_network_full_start_solutions'].append(neural_network_full_start_batch)
-        solutions['neural_network_random_solutions'].append(neural_network_random_batch)
-
-        times['cplex_times'].append(cplex_batch_time)
-        times['cover_matching_times'].append(cover_matching_batch_time)
-        times['greedy_start_times'].append(greedy_start_batch_time)
-        times['greedy_random_times'].append(greedy_random_batch_time)
-        times['networkx_times'].append(networkx_batch_time)
-        times['neural_network_empty_start_times'].append(neural_network_empty_start_batch_time)
-        times['neural_network_full_start_times'].append(neural_network_full_start_batch_time)
-        times['neural_network_random_start_times'].append(neural_network_random_batch_time)
+            solutions['neural network random'][-1].append([env.best_solution for env in test_envs])
+            times['neural network random'][-1].append(end - start)
     
         # Print this data to file for every new batch to save partway through
-        with open("test_data{}.txt".format(num_vertices), 'w') as f:
+        with open("{}_test_data{}.txt".format(problem_type, num_vertices), 'w') as f:
             f.write(str(solutions))
 
-        with open("test_times{}.txt".format(num_vertices), 'w') as f:
+        with open("{}_test_times{}.txt".format(problem_type, num_vertices), 'w') as f:
             f.write(str(times))
 
 
@@ -353,6 +291,9 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
+        fixed_algorithms = [CplexSolver(env=None, name='cplex'), NetworkXMinCoverSolver(env=None, name='networkx')]
+        stepped_algorithms = [Greedy(env=None, name='greedy')]
+        random_algorithms = [Greedy(env=None, name='greedy random'), CoverMatching(env=None, name='matching')]
     elif problem_type == 'max_cut':
         problem_params = {
             'optimisation': OptimisationTarget.CUT,
@@ -362,6 +303,9 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
+        fixed_algorithms = []
+        stepped_algorithms = []
+        random_algorithms = []
     elif problem_type == 'min_cut':
         problem_params = {
             'optimisation': OptimisationTarget.MIN_CUT,
@@ -371,6 +315,21 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
+        fixed_algorithms = []
+        stepped_algorithms = []
+        random_algorithms = []
+    elif problem_type == 'max_ind_set':
+        problem_params = {
+            'optimisation': OptimisationTarget.MAX_IND_SET,
+            'edge_type': EdgeType.UNIFORM,
+            'observables': DEFAULT_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1./num_vertices,
+            'reward_signal': RewardSignal.BLS
+        }
+        fixed_algorithms = [NetworkXMaxIndSetSolver(env = None, name = 'networkx')]
+        stepped_algorithms = []
+        random_algorithms = []
     else:
         print('Invalid problem type.')
         exit(1)
@@ -386,7 +345,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
         print('Invalid network type.')
         exit(1)
 
-    run(num_vertices, problem_type, graph_type, problem_params)
+    run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms, random_algorithms, stepped_algorithms)
 
 
 def predict(network, states, acting_in_reversible_spin_env, allowed_action_state):

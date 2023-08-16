@@ -11,7 +11,7 @@ from docplex.mp.model import Model
 class SpinSolver(ABC):
     """Abstract base class for agents solving SpinSystem Ising problems."""
 
-    def __init__(self, env : SpinSystemBase, record_cut=False, record_rewards=False, record_qs=False, verbose=False):
+    def __init__(self, env : SpinSystemBase, record_cut=False, record_rewards=False, record_qs=False, verbose=False, name=None):
         """Base initialisation of a SpinSolver.
 
         Args:
@@ -31,12 +31,17 @@ class SpinSolver(ABC):
         self.record_solution = record_cut
         self.record_rewards = record_rewards
         self.record_qs = record_qs
+        self.name = name
+        self.measure = 0
 
         self.total_reward = 0
 
     def reset(self, spins = None):
         self.total_reward = 0
         self.env.reset(spins)
+
+    def set_env(self, env):
+        self.env = env
 
     def solve(self, *args):
         """Solve the SpinSystem by flipping individual spins until termination.
@@ -55,6 +60,10 @@ class SpinSolver(ABC):
         while not done:
             reward, done = self.step(*args)
             self.total_reward += reward
+
+        # When done set measure to last seen state
+        # This is only used for algorithms that step until termination
+        self.measure = self.env.scorer.get_solution(self.env.state[0, :self.env.n_spins], self.env.matrix)
         return self.total_reward
 
     @abstractmethod
@@ -232,8 +241,8 @@ class Network(SpinSolver):
 
 
 class CoverMatching(SpinSolver):
-    def __init__(self, env: SpinSystemBase, record_cut=False, record_rewards=False, record_qs=False, verbose=False):
-        super().__init__(env, record_cut, record_rewards, record_qs, verbose)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def reset(self, spins=None):
         """
@@ -269,8 +278,8 @@ class CoverMatching(SpinSolver):
 
 
 class CplexSolver(SpinSolver):
-    def __init__(self, env: SpinSystemBase, record_cut=False, record_rewards=False, record_qs=False, verbose=False):
-        super().__init__(env, record_cut, record_rewards, record_qs, verbose)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._solver : Model = None
 
     def reset(self, spins=None):
@@ -303,34 +312,39 @@ class CplexSolver(SpinSolver):
         """
         Don't need step for this. cplex just solves instantly
         """
-        return None
+        raise NotImplementedError
     
 class NetworkXMinCoverSolver(SpinSolver):
-    def __init__(self, env: SpinSystemBase, record_cut=False, record_rewards=False, record_qs=False, verbose=False):
-        super().__init__(env, record_cut, record_rewards, record_qs, verbose)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    def reset(self):
+    def solve(self):
         """
-        Reset the environment and prepare the solver/solution
+        I'm going to assume the solution given is valid. Therefore measure is simply the size of the solution.
         """
-        super().reset()
-        self.env.reset([-1] * self.env.n_spins)
-        self._solution = list(nx.algorithms.approximation.min_weighted_vertex_cover(nx.Graph(self.env.matrix)))
-        self._current_index = 0
-
-    def step(self):
+        solution = list(nx.algorithms.approximation.min_weighted_vertex_cover(nx.Graph(self.env.matrix)))
+        # Solution for this is all the chosen nodes, therefore the length is the measure
+        self.measure = len(solution)
+    
+    def step(self, *args):
         """
-        Get the index of the current action to apply and do it on the environment
+        Unneeded for networkx because it solves instantly
         """
-        rew = 0
-        action = self._solution[self._current_index]
-        observation, reward, done, _ = self.env.step(action)
+        raise NotImplementedError
+    
+class NetworkXMaxIndSetSolver(SpinSolver):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-        rew += reward
+    def solve(self):
+        """
+        I'm going to assume the solution is valid. Therefore the measure is simply the size of the solution.
+        """
+        solution = list(nx.algorithms.approximation.maximum_independent_set(nx.Graph(self.env.matrix)))
+        self.measure = len(solution)
 
-        self._current_index += 1
-        if self._current_index == len(self._solution):
-            done = True
-
-        return rew, done
-        
+    def step(self, *args):
+        """
+        Unneeded for networkx solver.
+        """
+        raise NotImplementedError

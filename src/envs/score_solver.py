@@ -527,6 +527,12 @@ class MaximumIndependentSetUnbiasedSolver(MaximizationProblem):
         
         return np.sum(spins == 1)
     
+    def _get_measure(self, spins: ArrayLike, matrix: ArrayLike) -> float:
+        """
+        Same thing as the solution but without accounting for validity.
+        """
+        return np.sum(spins == 1)
+    
     def get_solution_quality_mask(self, spins: ArrayLike, matrix: ArrayLike) -> NDArray:
         """
         Seeing as it's a maximization problem, spins not in the solution (-1 state) should give a +1 quality and those in
