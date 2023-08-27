@@ -327,7 +327,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = [NetworkXMaxIndSetSolver(env = None, name = 'networkx')]
+        fixed_algorithms = [CplexSolver(env = None, name = 'cplex'), NetworkXMaxIndSetSolver(env = None, name = 'networkx')]
         stepped_algorithms = []
         random_algorithms = []
     else:

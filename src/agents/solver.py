@@ -301,6 +301,17 @@ class CplexSolver(SpinSolver):
             self._solver.minimize(self._solver.sum(variables))
             self.measure = len(self.env.matrix)
 
+        if self.env.optimisation_target == OptimisationTarget.MAX_IND_SET:
+            self._solver = Model('Maximum Independent Set')
+            variables = self._solver.integer_var_list(len(self.env.matrix), 0, 1, 'x')
+            for i in range(len(self.env.matrix)):
+                for j in range(i, len(self.env.matrix[i])):
+                    if self.env.matrix[i][j] == 1:
+                        self._solver.add_constraint(variables[i] + variables[j] <= 1, 'x_{} + x_{} <= 1'.format(i, j))
+
+            self._solver.maximize(self._solver.sum(variables))
+            self.measure = 0
+
     def solve(self):
         self._solver.solve()
         self._solver.print_information()

@@ -39,14 +39,10 @@ adjacency_matrix = np.array([
     [1, 1, 0, 0, 1, 0]
     ], dtype=np.float64)
 
-spins = np.array([1., -1., -1., -1., -1., 1.], dtype=np.float64)
-vals = spins * op.matmul(adjacency_matrix * np.array(spins == 1, dtype=np.float64), spins)
+spins = np.array([-1., -1., -1., -1., -1., 1.], dtype=np.float64)
+vals = - spins * op.matmul(adjacency_matrix * np.array(spins == 1, dtype=np.float64), spins)
+val = np.sum(adjacency_matrix * np.array([spins == 1]) * np.array([spins == 1]).T) / 2
 
 graph = nx.Graph(adjacency_matrix)
-# cover = nx.algorithms.approximation.vertex_cover.min_weighted_vertex_cover(graph)
-# chosen_cover = np.zeros(4)
-# np.put(chosen_cover, list(cover), 1)
-# other = nx.Graph(full)
-# nx.draw_networkx(full)
 nx.draw_networkx(graph)
 plt.show()
