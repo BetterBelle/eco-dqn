@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-vert_counts = [20, 40, 60, 80, 100, 200, 500]
-problem_type = 'min_cover'
+vert_counts = [20, 40, 60, 80, 100]
+problem_type = 'max_ind_set'
 training_graph_size = 20
 
 x = ["|V| = {}".format(i) for i in vert_counts]
@@ -39,7 +39,10 @@ else:
     cplex_solutions = [[1] * 100] * len(vert_counts)
 
 for alg in solution_data:
-    solution_data[alg] = list(np.divide(solution_data[alg], cplex_solutions))
+    if problem_type == 'max_ind_set' or problem_type == 'max_cut':
+        solution_data[alg] = list(np.divide(cplex_solutions, solution_data[alg]))
+    elif problem_type == 'min_cover' or problem_type == 'min_cut':
+        solution_data[alg] = list(np.divide(solution_data[alg], cplex_solutions))
 
 # Now we get the average approximation ratio for every sub-list
 for alg in solution_data:

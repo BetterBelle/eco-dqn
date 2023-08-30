@@ -11,8 +11,8 @@ from src.agents.dqn.utils import TestMetric
 from src.envs.utils import (SetGraphGenerator,
                             RandomErdosRenyiGraphGenerator,
                             EdgeType, RewardSignal, ExtraAction,
-                            OptimisationTarget, SpinBasis,
-                            MVC_OBSERVABLES, DEFAULT_OBSERVABLES,
+                            OptimisationTarget, SpinBasis, 
+                            DEFAULT_OBSERVABLES, MAIN_OBSERVABLES,
                             RandomBarabasiAlbertGraphGenerator,
                             Observable)
 from src.networks.mpnn import MPNN
@@ -245,7 +245,7 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
         problem_params = {
             'optimisation': OptimisationTarget.MIN_COVER,
             'edge_type': EdgeType.UNIFORM,
-            'observables': MVC_OBSERVABLES,
+            'observables': MAIN_OBSERVABLES,
             'reversible_spins': True,
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
@@ -272,7 +272,7 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
         problem_params = {
             'optimisation': OptimisationTarget.MAX_IND_SET,
             'edge_type': EdgeType.UNIFORM,
-            'observables': DEFAULT_OBSERVABLES,
+            'observables': MAIN_OBSERVABLES,
             'reversible_spins': True,
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS

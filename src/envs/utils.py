@@ -33,6 +33,7 @@ class OptimisationTarget(Enum):
     MIN_COVER = 3
     MIN_CUT = 4
     MAX_IND_SET = 5
+    MAX_CLIQUE = 6
 
 class SpinBasis(Enum):
 
@@ -80,20 +81,6 @@ MAIN_OBSERVABLES = [Observable.SPIN_STATE,
                     Observable.DISTANCE_FROM_BEST_STATE,
                     Observable.GLOBAL_VALIDITY_DIFFERENCE,
                     Observable.VALIDITY_BIT]
-
-# When invalid states are available for choosing, add observables
-MVC_OBSERVABLES = [Observable.SPIN_STATE,
-                   Observable.IMMEDIATE_VALIDITY_CHANGE,
-                   Observable.IMMEDIATE_VALIDITY_DIFFERENCE,
-                   Observable.IMMEDIATE_VALIDITY_CHANGE,
-                   Observable.TIME_SINCE_FLIP,
-                   Observable.TERMINATION_IMMANENCY,
-                   Observable.DISTANCE_FROM_BEST_SOLUTION,
-                   Observable.DISTANCE_FROM_BEST_STATE,
-                   Observable.NUMBER_OF_QUALITY_IMPROVEMENTS,
-                   Observable.NUMBER_OF_VALIDITY_IMPROVEMENTS,
-                   Observable.GLOBAL_VALIDITY_DIFFERENCE,
-                   Observable.VALIDITY_BIT]
 
 def calculate_cut(spins, matrix):
     """

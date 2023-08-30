@@ -596,6 +596,9 @@ class MaximumIndependentSetUnbiasedSolver(MaximizationProblem):
         normalized_scores = self.get_validity_mask(spins, matrix) * updated_quality - updated_invalidity
         # Now we return the score on each vertex flip - the current score to get the update in score value on flip
         return normalized_scores - self.get_normalized_score(spins, matrix)
+    
+class MaximumCliqueUnbiasedSolver(MaximizationProblem):
+    pass
 
     
 
@@ -616,6 +619,9 @@ class ScoreSolverFactory():
         
         elif problem_type == env_utils.OptimisationTarget.MAX_IND_SET and not is_biased_graph:
             return MaximumIndependentSetUnbiasedSolver(problem_type, is_biased_graph)
+        
+        elif problem_type == env_utils.OptimisationTarget.MAX_CLIQUE and not is_biased_graph:
+            return MaximumCliqueUnbiasedSolver(problem_type, is_biased_graph)
         
         # If make it here, invalid target
         raise NotImplementedError("Invalid optimization target: %s and biased %s", problem_type, is_biased_graph)
