@@ -9,8 +9,7 @@ from experiments.utils import test_network, load_graph_set
 from src.envs.utils import (SingleGraphGenerator,
                             RewardSignal, ExtraAction,
                             OptimisationTarget, SpinBasis,
-                            MVC_OBSERVABLES, EdgeType, DEFAULT_OBSERVABLES,
-                            Observable)
+                            EdgeType, Observable, DEFAULT_OBSERVABLES, MAIN_OBSERVABLES)
 from src.networks.mpnn import MPNN
 from src.agents.solver import *
 from src.envs.spinsystem import SpinSystemBase
@@ -274,10 +273,10 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             times['neural network random'][-1].append(end - start)
     
         # Print this data to file for every new batch to save partway through
-        with open("{}_test_data{}.txt".format(problem_type, num_vertices), 'w') as f:
+        with open("data/{}_test_data{}.txt".format(problem_type, num_vertices), 'w') as f:
             f.write(str(solutions))
 
-        with open("{}_test_times{}.txt".format(problem_type, num_vertices), 'w') as f:
+        with open("data/{}_test_times{}.txt".format(problem_type, num_vertices), 'w') as f:
             f.write(str(times))
 
 
@@ -286,7 +285,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
         problem_params = {
             'optimisation': OptimisationTarget.MIN_COVER,
             'edge_type': EdgeType.UNIFORM,
-            'observables': MVC_OBSERVABLES,
+            'observables': MAIN_OBSERVABLES,
             'reversible_spins': True,
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
@@ -322,12 +321,13 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
         problem_params = {
             'optimisation': OptimisationTarget.MAX_IND_SET,
             'edge_type': EdgeType.UNIFORM,
-            'observables': DEFAULT_OBSERVABLES,
+            'observables': MAIN_OBSERVABLES,
             'reversible_spins': True,
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = [CplexSolver(env = None, name = 'cplex'), NetworkXMaxIndSetSolver(env = None, name = 'networkx')]
+        # Not doing CPLEX yet for time purposes
+        fixed_algorithms = [NetworkXMaxIndSetSolver(env = None, name = 'networkx')]
         stepped_algorithms = []
         random_algorithms = []
     else:
