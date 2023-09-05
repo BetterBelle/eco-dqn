@@ -27,5 +27,5 @@ if network_type not in ['eco', 's2v']:
     print('Invalid network type')
     exit(1)
 
-run_with_vars(20, 'min_cover', 'ER', 'eco')
+run_with_vars(num_verts, problem_type, graph_type, network_type)
 

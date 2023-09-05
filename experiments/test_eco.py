@@ -1,4 +1,5 @@
 import os
+import json
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
@@ -36,6 +37,18 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
     print("data folder :", data_folder)
     print("network folder :", network_folder)
 
+
+    old_data = {}
+    old_times = {}
+
+    if os.path.exists("data/{}_test_data{}.txt".format(problem_type, num_vertices)):
+        with open("data/{}_test_data{}.txt".format(problem_type, num_vertices), 'r') as f:
+            old_data = json.loads(f.read().replace("'", '"'))
+    
+    if os.path.exists("data/{}_test_times{}.txt".format(problem_type, num_vertices)):
+        with open("data/{}_test_times{}.txt".format(problem_type, num_vertices), 'r') as f:
+            old_times = json.loads(f.read().replace("'", '"'))
+    
     network_save_path = os.path.join(network_folder, 'network_best.pth')
 
     print("network params :", network_save_path)
@@ -74,7 +87,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
     # LOAD VALIDATION GRAPHS
     ####################################################
 
-    graph_sizes = [20, 40, 60, 80, 100, 200, 500]
+    graph_sizes = [20]
     all_graphs = []
 
     ### TODO modify this to work with BA graphs as well
@@ -120,29 +133,34 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
     batch_size = 50
     for algorithm in fixed_algorithms + random_algorithms:
-        solutions['{}'.format(algorithm.name)] = []
-        times['{}'.format(algorithm.name)] = []
+        solutions['{}'.format(algorithm.name)] = {}
+        times['{}'.format(algorithm.name)] = {}
 
     for algorithm in stepped_algorithms:
-        solutions['{} empty start'.format(algorithm.name)] = []
-        solutions['{} full start'.format(algorithm.name)] = []
-        times['{} empty start'.format(algorithm.name)] = []
-        times['{} full start'.format(algorithm.name)] = []
+        solutions['{} empty start'.format(algorithm.name)] = {}
+        solutions['{} full start'.format(algorithm.name)] = {} 
+        times['{} empty start'.format(algorithm.name)] = {}
+        times['{} full start'.format(algorithm.name)] = {}
 
-    solutions['neural network empty'] = []
-    solutions['neural network full'] = []
-    solutions['neural network random'] = []
-    times['neural network empty'] = []
-    times['neural network full'] = []
-    times['neural network random'] = []
+    solutions['neural network empty {}'.format(num_vertices)] = {}
+    solutions['neural network full {}'.format(num_vertices)] = {}
+    solutions['neural network random {}'.format(num_vertices)] = {}
+    times['neural network empty {}'.format(num_vertices)] = {}
+    times['neural network full {}'.format(num_vertices)] = {}
+    times['neural network random {}'.format(num_vertices)] = {}
 
     test_envs : list[SpinSystemBase] = [None] * batch_size
 
     for i, graphs in enumerate(all_graphs):
         # append batches
         for algorithm in solutions:
-            solutions[algorithm].append([])
-            times[algorithm].append([])
+            solutions[algorithm][str(graphs[0].shape[0])] = []
+            times[algorithm][str(graphs[0].shape[0])] = []
+
+            if algorithm in old_data and str(graphs[0].shape[0]) in old_data[algorithm]:
+                solutions[algorithm][str(graphs[0].shape[0])] = old_data[algorithm][str(graphs[0].shape[0])]
+            if algorithm in old_times and str(graphs[0].shape[0]) in old_data[algorithm]:
+                times[algorithm][str(graphs[0].shape[0])] = old_times[algorithm][str(graphs[0].shape[0])]
 
         for j, test_graph in enumerate(graphs):
             env_args = {
@@ -169,47 +187,57 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
                                             **env_args)
             
             for algorithm in fixed_algorithms:
-                algorithm.set_env(test_envs[0])
-                algorithm.reset()
-                start = time.time()
-                algorithm.solve()
-                end = time.time()
-                solutions[algorithm.name][-1].append(algorithm.measure)
-                times[algorithm.name][-1].append(end - start)
-
-            for algorithm in stepped_algorithms:
-                # empty start
-                algorithm.set_env(test_envs[0])
-                algorithm.reset([-1] * test_envs[0].n_spins)
-                start = time.time()
-                algorithm.solve()
-                end = time.time()
-
-                solutions['{} empty start'.format(algorithm.name)][-1].append(algorithm.measure)
-                times['{} empty start'.format(algorithm.name)][-1].append(end - start)
-                
-                algorithm.reset([1] * test_envs[0].n_spins)
-                start = time.time()
-                algorithm.solve()
-                end = time.time()
-
-                solutions['{} full start'.format(algorithm.name)][-1].append(algorithm.measure)
-                times['{} full start'.format(algorithm.name)][-1].append(end - start)
-
-            for algorithm in random_algorithms:
-                # setup sub-batches for randomized algorithms
-                solutions[algorithm.name][-1].append([])
-                times[algorithm.name][-1].append([])
-
-                for i in range(batch_size):
-                    algorithm.set_env(test_envs[i])
+                if algorithm.name not in old_data or str(test_graph.shape[0]) not in old_data[algorithm.name]:
+                    algorithm.set_env(test_envs[0])
                     algorithm.reset()
                     start = time.time()
                     algorithm.solve()
                     end = time.time()
+                    solutions[algorithm.name][str(test_graph.shape[0])].append(algorithm.measure)
+                    times[algorithm.name][str(test_graph.shape[0])].append(end - start)
+                else:
+                    print("Previously computed {} based on old data, skipping.".format(algorithm.name))
 
-                    solutions[algorithm.name][-1][-1].append(algorithm.measure)
-                    times[algorithm.name][-1][-1].append(end - start)
+
+            for algorithm in stepped_algorithms:
+                if algorithm.name not in old_data or str(test_graph.shape[0]) not in old_data[algorithm.name]:
+                    # empty start
+                    algorithm.set_env(test_envs[0])
+                    algorithm.reset([-1] * test_envs[0].n_spins)
+                    start = time.time()
+                    algorithm.solve()
+                    end = time.time()
+
+                    solutions['{} empty start'.format(algorithm.name)][str(test_graph.shape[0])].append(algorithm.measure)
+                    times['{} empty start'.format(algorithm.name)][str(test_graph.shape[0])].append(end - start)
+                    
+                    algorithm.reset([1] * test_envs[0].n_spins)
+                    start = time.time()
+                    algorithm.solve()
+                    end = time.time()
+
+                    solutions['{} full start'.format(algorithm.name)][str(test_graph.shape[0])].append(algorithm.measure)
+                    times['{} full start'.format(algorithm.name)][str(test_graph.shape[0])].append(end - start)
+                else:
+                    print("Previously computed {} based on old data, skipping.".format(algorithm.name))
+
+            for algorithm in random_algorithms:
+                if algorithm.name not in old_data or str(test_graph.shape[0]) not in old_data[algorithm.name]:
+                    # setup sub-batches for randomized algorithms
+                    solutions[algorithm.name][str(test_graph.shape[0])].append([])
+                    times[algorithm.name][str(test_graph.shape[0])].append([])
+
+                    for i in range(batch_size):
+                        algorithm.set_env(test_envs[i])
+                        algorithm.reset()
+                        start = time.time()
+                        algorithm.solve()
+                        end = time.time()
+
+                        solutions[algorithm.name][str(test_graph.shape[0])][-1].append(algorithm.measure)
+                        times[algorithm.name][str(test_graph.shape[0])][-1].append(end - start)
+                else:
+                    print("Previously computed {} based on old data, skipping.".format(algorithm.name))
 
             # Next test network from empty state
             # First reset the environment to be empty, getting the observations
@@ -226,8 +254,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             end = time.time()
 
             # Once done, get best solution found into the batch
-            solutions['neural network empty'][-1].append(test_envs[0].best_solution)
-            times['neural network empty'][-1].append(end - start)
+            solutions['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
+            times['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
 
             # Next test network from full state
             print("Running GECO on full initial state")
@@ -243,8 +271,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             end = time.time()
 
             # Once done, get best solution found
-            solutions['neural network full'][-1].append(test_envs[0].best_solution)
-            times['neural network full'][-1].append(end - start)
+            solutions['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
+            times['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
             
             # Next test network from random state (run 50 tests on each graph)
             print("Running GECO on random inital state.")
@@ -269,8 +297,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             end = time.time()
 
             # Once done, add a list of every best solution to the solutions array
-            solutions['neural network random'][-1].append([env.best_solution for env in test_envs])
-            times['neural network random'][-1].append(end - start)
+            solutions['neural network random {}'.format(num_vertices)][str(test_graph.shape[0])].append([env.best_solution for env in test_envs])
+            times['neural network random {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
     
         # Print this data to file for every new batch to save partway through
         with open("data/{}_test_data{}.txt".format(problem_type, num_vertices), 'w') as f:

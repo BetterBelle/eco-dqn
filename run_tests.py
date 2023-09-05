@@ -2,8 +2,12 @@ from experiments.test_eco import run_with_params
 import sys
 
 if len(sys.argv) != 5:
-    print('Incorrect argument number')
-    exit(1)
+    num_verts = 20
+    problem_type = 'max_ind_set'
+    graph_type = 'ER'
+    network_type = 'eco'
+    print('Incorrect argument number') 
+    run_with_params(num_verts, problem_type, graph_type, network_type)
 
 self_filename = sys.argv[0]
 
