@@ -1,67 +1,72 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-vert_counts = [20, 40, 60, 80, 100]
 problem_type = 'max_ind_set'
 training_graph_size = 20
 
-x = ["|V| = {}".format(i) for i in vert_counts]
-
-ind = np.arange(len(x))
-width = 0.12
-
-with open('{}_test_data{}.txt'.format(problem_type, training_graph_size)) as f:
+with open('data/{}_test_data{}.txt'.format(problem_type, training_graph_size)) as f:
     solution_data : dict = eval(f.read())
 
-with open('{}_test_times{}.txt'.format(problem_type, training_graph_size)) as f:
+with open('data/{}_test_times{}.txt'.format(problem_type, training_graph_size)) as f:
     solution_times : dict = eval(f.read())
 
 algorithms = list(solution_data.keys())
+vert_counts = list(solution_data[algorithms[0]].keys())
+
+x = ["|V| = {}".format(i) for i in vert_counts]
+ind = np.arange(len(x))
+width = 0.12
 
 # Want to get mean from every non-single graph test
 for alg in solution_data:
     # If the solution_data's first graph size's first item is a list, then we want to change it to the mean solution
-    if type(solution_data[alg][0][0]) == list:
-        for i in range(len(solution_data[alg])):
-            for j in range(len(solution_data[alg][i])):
-                solution_data[alg][i][j] = np.mean(solution_data[alg][i][j])
+    if type(solution_data[alg]['20'][0]) == list:
+        for vert in solution_data[alg]:
+            for j in range(len(solution_data[alg][vert])):
+                solution_data[alg][vert][j] = np.mean(solution_data[alg][vert][j])
 
 for alg in solution_times:
-    if type(solution_times[alg][0][0]) == list:
-        for i in range(len(solution_times[alg])):
-            for j in range(len(solution_times[alg][i])):
-                solution_times[alg][i][j] = np.mean(solution_times[alg][i][j])
+    if type(solution_times[alg]['20'][0]) == list:
+        for vert in range(len(solution_times[alg])):
+            for j in range(len(solution_times[alg][vert])):
+                solution_times[alg][vert][j] = np.mean(solution_times[alg][vert][j])
 
 # Now we create approximation ratios with respect to the cplex solutions (always first in dict)
 if 'cplex' in solution_data:
     cplex_solutions = solution_data['cplex']
 else:
-    cplex_solutions = [[1] * 100] * len(vert_counts)
+    cplex_solutions = None
 
-for alg in solution_data:
-    if problem_type == 'max_ind_set' or problem_type == 'max_cut':
-        solution_data[alg] = list(np.divide(cplex_solutions, solution_data[alg]))
-    elif problem_type == 'min_cover' or problem_type == 'min_cut':
-        solution_data[alg] = list(np.divide(solution_data[alg], cplex_solutions))
+if cplex_solutions != None:
+    for alg in solution_data:
+        for vert in solution_data[alg]:
+            if problem_type == 'max_ind_set' or problem_type == 'max_cut':
+                solution_data[alg][vert] = list(np.divide(cplex_solutions[vert], solution_data[alg][vert]))
+            elif problem_type == 'min_cover' or problem_type == 'min_cut':
+                solution_data[alg][vert] = list(np.divide(solution_data[alg][vert], cplex_solutions[vert]))
 
-# Now we get the average approximation ratio for every sub-list
+# Now we get the average approximation ratio or solution for every sub-list
 for alg in solution_data:
-    for i in range(len(solution_data[alg])):
-        solution_data[alg][i] = np.mean(solution_data[alg][i])
+    for vert in solution_data[alg]:
+        solution_data[alg][vert] = np.mean(solution_data[alg][vert])
 
 for alg in solution_times:
-    for i in range(len(solution_times[alg])):
-        solution_times[alg][i] = np.mean(solution_times[alg][i])
+    for vert in solution_times[alg]:
+        solution_times[alg][vert] = np.mean(solution_times[alg][vert])
 
 bars = []
 plt.figure(figsize=(20, 10))
 
-for i, data in enumerate(solution_data):
-    bars.append(plt.bar(ind + width * i, solution_data[data], width))
+for i, alg in enumerate(solution_data):
+    next_data = []
+    for vert in solution_data[alg]:
+        next_data.append(solution_data[alg][vert])
+
+    bars.append(plt.bar(ind + width * i, next_data, width))
 
 for i, alg in enumerate(solution_data):
-    for j in range(len(solution_data[alg])):
-        plt.text(j + i * width, solution_data[alg][j], round(solution_data[alg][j], 2), ha='center', fontsize=8)
+    for j, vert in enumerate(solution_data[alg]):
+        plt.text(j + i * width, solution_data[alg][vert], round(solution_data[alg][vert], 2), ha='center', fontsize=8)
 
 
 plt.xlabel("Validation Graph Size")
@@ -76,15 +81,21 @@ plt.close()
 plt.cla()
 plt.clf()
 
+bars = []
 plt.figure(figsize=(20, 10))
-solution_times['neural network random'] = np.divide(solution_times['neural network random'], 50)
-
-for i, data in enumerate(solution_times):
-    bars.append(plt.bar(ind + width * i, solution_times[data], width))
+for vert in solution_times['neural network random {}'.format(str(training_graph_size))]:
+    solution_times['neural network random {}'.format(str(training_graph_size))][vert] = np.divide(solution_times['neural network random {}'.format(str(training_graph_size))][vert], 50)
 
 for i, alg in enumerate(solution_times):
-    for j in range(len(solution_times[alg])):
-        plt.text(j + i * width, solution_times[alg][j], round(solution_times[alg][j], 2), ha='center', fontsize=8)
+    next_data = []
+    for vert in solution_times[alg]:
+        next_data.append(solution_times[alg][vert])
+
+    bars.append(plt.bar(ind + width * i, next_data, width))
+
+for i, alg in enumerate(solution_times):
+    for j, vert in enumerate(solution_times[alg]):
+        plt.text(j + i * width, solution_times[alg][vert], round(solution_times[alg][vert], 2), ha='center', fontsize=8)
 
 
 plt.xlabel("Validation Graph Size")
