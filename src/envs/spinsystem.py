@@ -1,4 +1,5 @@
 from collections import namedtuple
+from networkx import is_valid_joint_degree
 
 import numpy as np
 # import networkx as nx
@@ -157,6 +158,7 @@ class SpinSystemBase():
         self.stag_punishment = stag_punishment
         self.basin_reward = basin_reward
         self.reversible_spins = reversible_spins
+        self.solution_found = False
 
         self.reset()
 
@@ -228,6 +230,9 @@ class SpinSystemBase():
         self.best_score_normalized = self.normalized_score
         self.best_obs_score = self.score
         self.best_obs_score_normalized = self.normalized_score
+
+        ### For testing finding a valid solution first
+        self.solution_found = False
 
         ### Best solution is the actual solution of the current state, not the score
         self.best_solution = self.solution
@@ -349,7 +354,10 @@ class SpinSystemBase():
 
         rew = 0 # Default reward to zero.
         randomised_spins = False
-        self.current_step += 1
+
+        ### Only increment the step if a valid solution has been found before
+        if self.solution_found:
+            self.current_step += 1
 
         if self.current_step > self.max_steps:
             print("The environment has already returned done. Stop it!")
@@ -445,11 +453,13 @@ class SpinSystemBase():
                     rew += self.basin_reward
 
         if self.score > self.best_score:
-            ### TODO: add the normalized version of the score in here as well, so we don't have to recompute it every time
             self.best_score = self.score
             self.best_score_normalized = self.normalized_score
             self.best_spins = self.state[0, :self.n_spins].copy()
             self.best_solution = self.scorer.get_solution(self.best_spins, self.matrix)
+
+            # For the timed version, we'll also set the step back to zero
+            self.current_step = 1
 
         if self.memory_length is not None:
             # For case of finite memory length.
@@ -537,6 +547,10 @@ class SpinSystemBase():
                 # If no more spins to flip --> done.
                 # print("Done : no more spins to flip")
                 done = True
+
+        ### If we've found a valid solution, set the solution_found to true
+        if self.scorer.is_valid(self.state[0, :self.n_spins], self.matrix):
+            self.solution_found = True
 
         return (self.get_observation(), rew, done, None)
 
