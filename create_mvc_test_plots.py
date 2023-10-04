@@ -83,8 +83,13 @@ plt.clf()
 
 bars = []
 plt.figure(figsize=(20, 10))
-for vert in solution_times['neural network random {}'.format(str(training_graph_size))]:
-    solution_times['neural network random {}'.format(str(training_graph_size))][vert] = np.divide(solution_times['neural network random {}'.format(str(training_graph_size))][vert], 50)
+if 'neural network random {}'.format(str(training_graph_size)) in solution_times:
+    for vert in solution_times['neural network random {}'.format(str(training_graph_size))]:
+        solution_times['neural network random {}'.format(str(training_graph_size))][vert] = np.divide(solution_times['neural network random {}'.format(str(training_graph_size))][vert], 50)
+
+if 'neural network partial {}'.format(str(training_graph_size)) in solution_times:
+    for vert in solution_times['neural network partial {}'.format(str(training_graph_size))]:
+        solution_times['neural network partial {}'.format(str(training_graph_size))][vert] = np.divide(solution_times['neural network partial {}'.format(str(training_graph_size))][vert], 50)
 
 for i, alg in enumerate(solution_times):
     next_data = []
