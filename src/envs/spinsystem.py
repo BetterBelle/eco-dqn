@@ -455,9 +455,6 @@ class SpinSystemBase():
             self.best_spins = self.state[0, :self.n_spins].copy()
             self.best_solution = self.scorer.get_solution(self.best_spins, self.matrix)
 
-            # For the timed version, we'll also set the step back to zero
-            self.current_step = 0
-
         if self.memory_length is not None:
             # For case of finite memory length.
             ### TODO: Figure out how this works and maybe consider adding normalized score
