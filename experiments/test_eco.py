@@ -130,6 +130,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
     ### Forcing cplex to be the first because it's fixed
     solutions = {}
     times = {}
+    histories = {}
 
     batch_size = 50
     for algorithm in fixed_algorithms + random_algorithms:
@@ -142,12 +143,16 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
         times['{} empty start'.format(algorithm.name)] = {}
         times['{} full start'.format(algorithm.name)] = {}
 
-    solutions['neural network empty {}'.format(num_vertices)] = {}
-    solutions['neural network full {}'.format(num_vertices)] = {}
-    solutions['neural network random {}'.format(num_vertices)] = {}
-    times['neural network empty {}'.format(num_vertices)] = {}
-    times['neural network full {}'.format(num_vertices)] = {}
-    times['neural network random {}'.format(num_vertices)] = {}
+    # solutions['neural network empty {}'.format(num_vertices)] = {}
+    # solutions['neural network full {}'.format(num_vertices)] = {}
+    # solutions['neural network random {}'.format(num_vertices)] = {}
+    # times['neural network empty {}'.format(num_vertices)] = {}
+    # times['neural network full {}'.format(num_vertices)] = {}
+    # times['neural network random {}'.format(num_vertices)] = {}
+    solutions['neural network partial {}'.format(num_vertices)] = {}
+    times['neural network partial {}'.format(num_vertices)] = {}
+    histories['neural network partial {}'.format(num_vertices)] = {}
+
 
     test_envs : list[SpinSystemBase] = [None] * batch_size
 
@@ -161,6 +166,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
                 solutions[algorithm][str(graphs[0].shape[0])] = old_data[algorithm][str(graphs[0].shape[0])]
             if algorithm in old_times and str(graphs[0].shape[0]) in old_data[algorithm]:
                 times[algorithm][str(graphs[0].shape[0])] = old_times[algorithm][str(graphs[0].shape[0])]
+
+        histories['neural network partial {}'.format(num_vertices)][str(graphs[0].shape[0])] = []
 
         for j, test_graph in enumerate(graphs):
             env_args = {
@@ -239,66 +246,102 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
                 else:
                     print("Previously computed {} based on old data, skipping.".format(algorithm.name))
 
+            # Next test network from random state (run 50 tests on each graph)
+            # This is specifically for max_ind_set
+            print("Running GECO on partial solution inital state.")
+            # First thing, create partial solution for all environments
+            # for env in test_envs:
+            #     vertices = np.array([-1] * env.n_spins, dtype=np.float64)
+            #     matrix = env.matrix
+            #     # Make sure that the score mask has at least one positive value (indicating a vertex that can be added)
+            #     while np.any(env.scorer.get_score_mask(vertices, matrix) > 0):
+            #         # create all indexes of valid score increases
+            #         indexes = [i for i in range(len(vertices)) if env.scorer.get_score_mask(vertices, matrix)[i] > 0]
+            #         index = random.choice(indexes)
+            #         vertices[index] = 1
+
+            #     network_solver.reset(vertices)
+            network_solver = Network(network=network, env=test_envs[0], name='network partial solution');
+
+            start = time.time()
+            vertices = np.array([-1] * test_envs[0].n_spins, dtype=np.float64)
+            matrix = test_envs[0].matrix 
+
+            while np.any(network_solver.env.scorer.get_score_mask(vertices, matrix) > 0):
+                indexes = [i for i in range(len(vertices)) if network_solver.env.scorer.get_score_mask(vertices, matrix)[i] > 0]
+                index = random.choice(indexes)
+                vertices[index] = 1
+
+            network_solver.reset(vertices)
+
+            network_solver.solve()
+            end = time.time()
+            
+            # Once done, get best solution found into the batch
+            solutions['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
+            times['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
+            histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
+
             # Next test network from empty state
             # First reset the environment to be empty, getting the observations
-            print("Running GECO on empty initial state.")
-            obs_batch = test_envs[0].reset([-1] * test_envs[0].n_spins)
-            start = time.time()
-            done = False
-            while not done:
-                obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
-                action = predict(network, obs_batch, test_envs[0].reversible_spins, test_envs[0].get_allowed_action_states())[0]
-                obs, rew, done, info = test_envs[0].step(action)
-                obs_batch = obs
+            # print("Running GECO on empty initial state.")
+            # obs_batch = test_envs[0].reset([-1] * test_envs[0].n_spins)
+            # start = time.time()
+            # done = False
+            # while not done:
+            #     obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
+            #     action = predict(network, obs_batch, test_envs[0].reversible_spins, test_envs[0].get_allowed_action_states())[0]
+            #     obs, rew, done, info = test_envs[0].step(action)
+            #     obs_batch = obs
             
-            end = time.time()
+            # end = time.time()
 
-            # Once done, get best solution found into the batch
-            solutions['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
-            times['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
+            # # Once done, get best solution found into the batch
+            # solutions['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
+            # times['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
 
-            # Next test network from full state
-            print("Running GECO on full initial state")
-            obs_batch = test_envs[0].reset([1] * test_envs[0].n_spins)
-            start = time.time()
-            done = False
-            while not done:
-                obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
-                action = predict(network, obs_batch, test_envs[0].reversible_spins, test_envs[0].get_allowed_action_states())[0]
-                obs, rew, done, info = test_envs[0].step(action)
-                obs_batch = obs
+            # # Next test network from full state
+            # print("Running GECO on full initial state")
+            # obs_batch = test_envs[0].reset([1] * test_envs[0].n_spins)
+            # start = time.time()
+            # done = False
+            # while not done:
+            #     obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
+            #     action = predict(network, obs_batch, test_envs[0].reversible_spins, test_envs[0].get_allowed_action_states())[0]
+            #     obs, rew, done, info = test_envs[0].step(action)
+            #     obs_batch = obs
 
-            end = time.time()
+            # end = time.time()
 
-            # Once done, get best solution found
-            solutions['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
-            times['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
+            # # Once done, get best solution found
+            # solutions['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
+            # times['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
             
-            # Next test network from random state (run 50 tests on each graph)
-            print("Running GECO on random inital state.")
-            obs_batch = []
-            done = False
-            # Reset all the environments
-            for env in test_envs:
-                obs_batch.append(env.reset())
+            # # Next test network from random state (run 50 tests on each graph)
+            # print("Running GECO on random inital state.")
+            # obs_batch = []
+            # done = False
+            # # Reset all the environments
+            # for env in test_envs:
+            #     obs_batch.append(env.reset())
 
-            start = time.time()
+            # start = time.time()
 
-            while not done:
-                obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
-                # All envs in the batch have the same parameters, so pass them all to the predict
-                actions = predict(network, obs_batch, test_envs[0].reversible_spins, test_envs[0].get_allowed_action_states())
+            # while not done:
+            #     obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
+            #     # All envs in the batch have the same parameters, so pass them all to the predict
+            #     actions = predict(network, obs_batch, test_envs[0].reversible_spins, test_envs[0].get_allowed_action_states())
 
-                obs_batch = []
-                for env, action in zip(test_envs, actions):
-                    obs, rew, done, info = env.step(action)
-                    obs_batch.append(obs)
+            #     obs_batch = []
+            #     for env, action in zip(test_envs, actions):
+            #         obs, rew, done, info = env.step(action)
+            #         obs_batch.append(obs)
 
-            end = time.time()
+            # end = time.time()
 
-            # Once done, add a list of every best solution to the solutions array
-            solutions['neural network random {}'.format(num_vertices)][str(test_graph.shape[0])].append([env.best_solution for env in test_envs])
-            times['neural network random {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
+            # # Once done, add a list of every best solution to the solutions array
+            # solutions['neural network random {}'.format(num_vertices)][str(test_graph.shape[0])].append([env.best_solution for env in test_envs])
+            # times['neural network random {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
     
         # Print this data to file for every new batch to save partway through
         with open("data/{}_test_data{}.txt".format(problem_type, num_vertices), 'w') as f:
@@ -306,6 +349,9 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
         with open("data/{}_test_times{}.txt".format(problem_type, num_vertices), 'w') as f:
             f.write(str(times))
+
+        with open("data/{}_histories{}.txt".format(problem_type, num_vertices), 'w') as f:
+            f.write(str(histories))
 
 
 def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER', network_type='eco'):

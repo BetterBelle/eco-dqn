@@ -161,7 +161,7 @@ class Random(SpinSolver):
 class Network(SpinSolver):
     """A network-only solver for a SpinSystem."""
 
-    epsilon = 0.
+    epsilon = 0
 
     def __init__(self, network, *args, **kwargs):
         """Initialise a network-only solver.
@@ -181,9 +181,15 @@ class Network(SpinSolver):
         self.current_observation = self.env.get_observation()
         self.current_observation = torch.FloatTensor(self.current_observation).to(self.device)
 
+        self.record_solution = True
+        self.record_qs = True
+        self.record_rewards = True
+
         self.history = []
 
     def reset(self, spins=None, clear_history=True):
+        if type(self.env) != SpinSystemBase:
+            pass
         self.current_observation = self.env.reset(spins)
         self.current_observation = torch.FloatTensor(self.current_observation).to(self.device)
         self.total_reward = 0
@@ -234,6 +240,7 @@ class Network(SpinSolver):
                 record += [qs]
 
         record += [self.env.scorer.get_score_mask(self.env.state[0, :self.env.n_spins], self.env.matrix)]
+        record += [self.env.scorer.is_valid(self.env.state[0, :self.env.n_spins], self.env.matrix)]
 
         self.history.append(record)
 
