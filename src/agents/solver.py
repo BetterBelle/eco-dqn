@@ -184,6 +184,7 @@ class Network(SpinSolver):
         self.record_solution = True
         self.record_qs = True
         self.record_rewards = True
+        self.record_spins = True
 
         self.history = []
 
@@ -231,15 +232,17 @@ class Network(SpinSolver):
         if not self.record_solution and not self.record_rewards:
             record = [action]
         else:
-            record = [action]
+            record = [float(action)]
             if self.record_solution:
-                record += [self.env.scorer.get_solution(self.env.state[0, :self.env.n_spins], self.env.matrix)]
+                record += [float(self.env.scorer.get_solution(self.env.state[0, :self.env.n_spins], self.env.matrix))]
             if self.record_rewards:
-                record += [reward]
+                record += [float(reward)]
             if self.record_qs:
-                record += [qs]
+                record += [qs.tolist()]
+            if self.record_spins:
+                record += [list(self.env.state[0, :self.env.n_spins])]
 
-        record += [self.env.scorer.get_score_mask(self.env.state[0, :self.env.n_spins], self.env.matrix)]
+        record += [list(self.env.scorer.get_score_mask(self.env.state[0, :self.env.n_spins], self.env.matrix))]
         record += [self.env.scorer.is_valid(self.env.state[0, :self.env.n_spins], self.env.matrix)]
 
         self.history.append(record)

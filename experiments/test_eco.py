@@ -280,7 +280,9 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             # Once done, get best solution found into the batch
             solutions['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
             times['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
-            histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
+
+            if len(histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
+                histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
 
             # Next test network from empty state
             # First reset the environment to be empty, getting the observations
