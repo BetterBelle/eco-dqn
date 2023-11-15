@@ -197,6 +197,23 @@ class Network(SpinSolver):
 
         if clear_history:
             self.history = []
+            if not self.record_solution and not self.record_rewards:
+                record = [0]
+            else:
+                record = [float(0)]
+                if self.record_solution:
+                    record += [float(self.env.scorer.get_solution(self.env.state[0, :self.env.n_spins], self.env.matrix))]
+                if self.record_rewards:
+                    record += [float(0)]
+                if self.record_qs:
+                    record += [[0] * self.env.n_spins]
+                if self.record_spins:
+                    record += [list(self.env.state[0, :self.env.n_spins])]
+
+            record += [list(self.env.scorer.get_score_mask(self.env.state[0, :self.env.n_spins], self.env.matrix))]
+            record += [self.env.scorer.is_valid(self.env.state[0, :self.env.n_spins], self.env.matrix)]
+
+            self.history.append(record)
 
     @torch.no_grad()
     def step(self):

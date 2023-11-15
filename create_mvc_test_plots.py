@@ -1,14 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import json
 
 problem_type = 'max_ind_set'
 training_graph_size = 20
 
 with open('data/{}_test_data{}.txt'.format(problem_type, training_graph_size)) as f:
-    solution_data : dict = eval(f.read())
+    solution_data = json.load(f)
 
 with open('data/{}_test_times{}.txt'.format(problem_type, training_graph_size)) as f:
-    solution_times : dict = eval(f.read())
+    solution_times = json.load(f)
 
 algorithms = list(solution_data.keys())
 vert_counts = list(solution_data[algorithms[0]].keys())
