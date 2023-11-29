@@ -319,12 +319,6 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             if len(histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
                 histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
 
-            # Once done, get best solution found
-            solutions['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
-            times['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
-            if len(histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
-                histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
-            
             # # Next test network from random state (run 50 tests on each graph)
             # print("Running GECO on random inital state.")
             # obs_batch = []

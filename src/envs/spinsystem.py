@@ -218,8 +218,6 @@ class SpinSystemBase():
         self.normalized_score = self.scorer.get_normalized_score(self.state[0, :self.n_spins], self.matrix)
         self.solution = self.scorer.get_solution(self.state[0, :self.n_spins], self.matrix)
 
-        # nx.draw_networkx(nx.Graph(self.matrix))
-        # plt.show()
 
         if self.reward_signal == RewardSignal.SINGLE:
             self.init_score = self.score
@@ -531,7 +529,7 @@ class SpinSystemBase():
         #############################################################################################
         # 4. Check termination criteria.                                                            #
         #############################################################################################
-        if self.current_step == self.max_steps:
+        if self.current_step == self.max_steps // 4:
             # Maximum number of steps taken --> done.
             # print("Done : maximum number of steps taken")
             done = True
