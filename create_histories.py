@@ -54,10 +54,10 @@ for init in problem_init:
                 qs = step[3]
                 spins = str(step[4])
                 score_mask = step[5]
-                validity = bool(step[6])
+                validity = step[6]
 
                 # setup dictionaries
-                if validity:
+                if validity == 'True':
                     if spins in valid_states:
                         valid_states[spins] += 1
                     else:
@@ -92,7 +92,7 @@ for init in problem_init:
                 if index == 0:
                     first_solution = solution 
                 # last solution
-                if index == len(graph) - 1:
+                if index == len(graph):
                     last_solution = solution
                 # first and last invalid
                 if not validity and first_invalid_state == -1:
@@ -144,7 +144,7 @@ for init in problem_init:
                     repeated_actions,
                     local_opt,
                     best_found_local_opt,
-                    len(graph) // 2,
+                    (len(graph) - 1) * 4,
             ]
             df.loc[len(df)] = row
 

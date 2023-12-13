@@ -141,6 +141,7 @@ class SpinSystemBase():
         self.observation_space = self.observation_space(self.n_spins, len(self.observables))
 
         self.current_step = 0
+        self.early_stopping = 0
 
         if self.gg.biased:
             self.matrix, self.bias = self.gg.get()
@@ -180,6 +181,7 @@ class SpinSystemBase():
         resetting the graph observables, resetting the local rewards and so on.
         """
         self.current_step = 0
+        self.early_stopping = 0
 
         if self.gg.biased:
             # self.matrix, self.bias = self.gg.get(with_padding=(self.extra_action != ExtraAction.NONE))
@@ -353,6 +355,7 @@ class SpinSystemBase():
 
         ### Only increment the step if a valid solution has been found before
         self.current_step += 1
+        self.early_stopping += 1
 
         if self.current_step > self.max_steps:
             print("The environment has already returned done. Stop it!")
@@ -408,6 +411,7 @@ class SpinSystemBase():
         immediate_score_changes = self.scorer.get_score_mask(self.state[0, :self.n_spins], self.matrix)
 
         if self.score > self.best_obs_score:
+            self.early_stopping = 0
             if self.reward_signal == RewardSignal.BLS:
                 if self.norm_rewards:
                     rew = self.normalized_score - self.best_obs_score_normalized
@@ -529,7 +533,7 @@ class SpinSystemBase():
         #############################################################################################
         # 4. Check termination criteria.                                                            #
         #############################################################################################
-        if self.current_step == self.max_steps // 4:
+        if self.current_step == self.max_steps or self.early_stopping == 15:
             # Maximum number of steps taken --> done.
             # print("Done : maximum number of steps taken")
             done = True
