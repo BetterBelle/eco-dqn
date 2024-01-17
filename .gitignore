@@ -23,6 +23,3 @@ network[0-9]*.pth
 ER_[1-9]*spin
 *test_data*.txt
 *test_times*.txt
-
-# ignore histories
-data/*_histories*.txt
