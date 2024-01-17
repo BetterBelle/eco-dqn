@@ -354,7 +354,15 @@ class MaximumCutUnbiasedScorer(MaximizationProblem):
         """
         The total weight of positive vertex weights. In case of all negative weights, set to 1.
         """
-        self._solution_quality_normalizer = max(1, np.sum(np.multiply(matrix, (matrix > 0))))
+        self._solution_quality_normalizer = max(1, np.sum(np.multiply(matrix, (matrix > 0))) / 2)
+
+    def set_lower_bound(self, spins: npt.ArrayLike, matrix: npt.ArrayLike) -> None:
+        """
+        The lower bound to shift the quality. In case of max cut, that's the sum of
+        all negative edges. Therefore, we sum all edges that are negative, then divide
+        by two as we double count every edge.
+        """
+        self._lower_bound = min(0, np.sum(np.multiply(matrix, (matrix < 0))) / 2)
 
     def set_max_local_reward(self, spins: ArrayLike, matrix: ArrayLike) -> None:
         """

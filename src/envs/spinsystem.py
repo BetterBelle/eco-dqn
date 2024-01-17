@@ -15,7 +15,8 @@ from src.envs.utils import (EdgeType,
                             DEFAULT_OBSERVABLES,
                             GraphGenerator,
                             RandomGraphGenerator,
-                            HistoryBuffer)
+                            HistoryBuffer,
+                            Stopping)
 
 # A container for get_result function below. Works just like tuple, but prettier.
 ActionResult = namedtuple("action_result", ("snapshot","observation","reward","is_done","info"))
@@ -40,10 +41,11 @@ class SpinSystemFactory(object):
             basin_reward=None, # None means no reward for reaching a local minima.
             reversible_spins=True, # Whether the spins can be flipped more than once (i.e. True-->Georgian MDP).
             init_snap=None,
-            seed=None):
+            seed=None,
+            stopping=Stopping.NORMAL):
 
         return SpinSystemBase(graph_generator, max_steps, observables, reward_signal, extra_action, optimisation_target, spin_basis,
-                              norm_rewards,memory_length,horizon_length,stag_punishment,basin_reward,reversible_spins,init_snap,seed)
+                              norm_rewards,memory_length,horizon_length,stag_punishment,basin_reward,reversible_spins,init_snap,seed,stopping)
 
 class SpinSystemBase():
     '''
@@ -91,7 +93,8 @@ class SpinSystemBase():
                  basin_reward=None,
                  reversible_spins=False,
                  init_snap=None,
-                 seed=None):
+                 seed=None,
+                 stopping=Stopping.NORMAL):
         '''
         Init method.
 
@@ -128,6 +131,7 @@ class SpinSystemBase():
 
         self.n_spins = self.gg.n_spins  # Total number of spins in episode
         self.max_steps = max_steps  # Number of actions before reset
+        self.early_stopping_max = 15
 
         self.reward_signal = reward_signal
         self.norm_rewards = norm_rewards
@@ -141,6 +145,7 @@ class SpinSystemBase():
         self.observation_space = self.observation_space(self.n_spins, len(self.observables))
 
         self.current_step = 0
+        self.stopping_type = stopping
         self.early_stopping = 0
 
         if self.gg.biased:
@@ -533,9 +538,15 @@ class SpinSystemBase():
         #############################################################################################
         # 4. Check termination criteria.                                                            #
         #############################################################################################
-        if self.current_step == self.max_steps or self.early_stopping == 15:
+        if self.current_step == self.max_steps:
             # Maximum number of steps taken --> done.
             # print("Done : maximum number of steps taken")
+            done = True
+
+        if self.stopping_type == Stopping.EARLY and self.early_stopping == self.early_stopping_max:
+            done = True
+
+        if self.stopping_type == Stopping.QUARTER and self.current_step == self.max_steps // 4:
             done = True
 
         if not self.reversible_spins:

@@ -14,7 +14,7 @@ from src.envs.utils import (SetGraphGenerator,
                             OptimisationTarget, SpinBasis, 
                             DEFAULT_OBSERVABLES, MAIN_OBSERVABLES,
                             RandomBarabasiAlbertGraphGenerator,
-                            Observable)
+                            Observable, Stopping)
 from src.networks.mpnn import MPNN
 
 try:
@@ -248,7 +248,8 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
             'observables': MAIN_OBSERVABLES,
             'reversible_spins': True,
             'basin_reward': 1./num_vertices,
-            'reward_signal': RewardSignal.BLS
+            'reward_signal': RewardSignal.BLS,
+            'stopping': Stopping.NORMAL
         }
     elif problem_type == 'max_cut':
         problem_params = {
@@ -257,7 +258,8 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
             'observables': DEFAULT_OBSERVABLES,
             'reversible_spins': True,
             'basin_reward': 1./num_vertices,
-            'reward_signal': RewardSignal.BLS
+            'reward_signal': RewardSignal.BLS,
+            'stopping': Stopping.NORMAL
         }
     elif problem_type == 'min_cut':
         problem_params = {
@@ -266,7 +268,8 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
             'observables': DEFAULT_OBSERVABLES,
             'reversible_spins': True,
             'basin_reward': 1./num_vertices,
-            'reward_signal': RewardSignal.BLS
+            'reward_signal': RewardSignal.BLS,
+            'stopping': Stopping.NORMAL
         }
     elif problem_type == 'max_ind_set':
         problem_params = {
@@ -275,7 +278,8 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
             'observables': MAIN_OBSERVABLES,
             'reversible_spins': True,
             'basin_reward': 1./num_vertices,
-            'reward_signal': RewardSignal.BLS
+            'reward_signal': RewardSignal.BLS,
+            'stopping': Stopping.NORMAL
         }
     else:
         print('Invalid problem type.')
@@ -291,6 +295,7 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
     else:
         print('Invalid network type.')
         exit(1)
+
     
 
     if graph_type == 'ER':

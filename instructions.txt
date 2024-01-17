@@ -1,0 +1,50 @@
+SETTING UP PYTHON ENVIRONMENT:
+Must have Python 3.9, and either the package manager pip along with virtualenv or conda.
+
+PIP INSTRUCTIONS:
+
+Create a virtual environment named "env" using the command 
+virtualenv ./env
+
+Activate the environment with the command
+source ./env/bin/activate
+
+Upgrade pip
+pip install --upgrade pip
+
+Install requirements
+pip install -r requirements_pip.txt
+
+CONDA INSTRUCTIONS:
+Run the command
+conda create --name env --file requirements_conda.txt
+
+Activate the environment using 
+conda activate env
+
+RUNNING TRAINING:
+python run_training.py <num_verts> <problem_type> <graph_type> <network_type>
+
+RUNNING TESTS:
+python run_tests.py <num_verts> <problem_type> <graph_type> <network_type>
+
+PARAM EXPLANATION:
+num_verts is the network training graph size. If you trained a network with
+20 vertex graphs, num_verts would be 20 for testing as well. The tests always run on graphs of size 
+20, 40, 60, 80, 100, 200 and 500 vertices regardless of the training graphs.
+
+In both training and testing, the problem_type is one of
+min_cover
+max_ind_set
+max_cut
+min_cut
+
+Keep in mind, the tests for max_cut and min_cut may only run with the network and
+not have anything to compare.
+
+graph_type must be ER. I can't remember if I implemented BA graphs yet for either
+testing or training.
+
+network_type is one of either eco or s2v. eco is the exploratory network, s2v constructs
+a solution and stops when the solution is locally optimal. The project is designed
+using eco, so using this parameter is what I've been using. 

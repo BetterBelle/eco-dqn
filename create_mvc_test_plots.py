@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 
-problem_type = 'max_ind_set'
+problem_type = 'min_cover'
 training_graph_size = 20
 
 with open('data/{}_test_data{}.txt'.format(problem_type, training_graph_size)) as f:
@@ -12,7 +12,9 @@ with open('data/{}_test_times{}.txt'.format(problem_type, training_graph_size)) 
     solution_times = json.load(f)
 
 algorithms = list(solution_data.keys())
+print(algorithms)
 vert_counts = list(solution_data[algorithms[0]].keys())
+print(vert_counts)
 
 x = ["|V| = {}".format(i) for i in vert_counts]
 ind = np.arange(len(x))
@@ -28,7 +30,7 @@ for alg in solution_data:
 
 for alg in solution_times:
     if type(solution_times[alg]['20'][0]) == list:
-        for vert in range(len(solution_times[alg])):
+        for vert in solution_times[alg]:
             for j in range(len(solution_times[alg][vert])):
                 solution_times[alg][vert][j] = np.mean(solution_times[alg][vert][j])
 

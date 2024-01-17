@@ -3,6 +3,7 @@ import sys
 
 if len(sys.argv) != 5:
     print('Incorrect argument number')
+    print('Usage: python run_training vertex_count problem_type graph_type network_type')
     exit(1)
 
 self_filename = sys.argv[0]

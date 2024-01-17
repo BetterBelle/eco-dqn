@@ -10,7 +10,7 @@ from experiments.utils import test_network, load_graph_set
 from src.envs.utils import (SingleGraphGenerator,
                             RewardSignal, ExtraAction,
                             OptimisationTarget, SpinBasis,
-                            EdgeType, Observable, DEFAULT_OBSERVABLES, MAIN_OBSERVABLES)
+                            EdgeType, Observable, DEFAULT_OBSERVABLES, MAIN_OBSERVABLES, Stopping)
 from src.networks.mpnn import MPNN
 from src.agents.solver import *
 from src.envs.spinsystem import SpinSystemBase
@@ -93,7 +93,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
                 'horizon_length':None,
                 'stag_punishment':None,
                 'basin_reward':problem_params['basin_reward'],
-                'reversible_spins':problem_params['reversible_spins']}
+                'reversible_spins':problem_params['reversible_spins'],
+                'stopping':problem_params['stopping']}
 
     ####################################################
     # LOAD VALIDATION GRAPHS
@@ -216,6 +217,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             
             for algorithm in fixed_algorithms:
                 if algorithm.name not in old_data or str(test_graph.shape[0]) not in old_data[algorithm.name]:
+                    print("Running algorithm: " + str(algorithm.name))
                     algorithm.set_env(test_envs[0])
                     algorithm.reset()
                     start = time.time()
@@ -229,6 +231,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
             for algorithm in stepped_algorithms:
                 if algorithm.name not in old_data or str(test_graph.shape[0]) not in old_data[algorithm.name]:
+                    print("Running algorithm from empty: " + str(algorithm.name))
                     # empty start
                     algorithm.set_env(test_envs[0])
                     algorithm.reset([-1] * test_envs[0].n_spins)
@@ -238,6 +241,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
                     solutions['{} empty start'.format(algorithm.name)][str(test_graph.shape[0])].append(algorithm.measure)
                     times['{} empty start'.format(algorithm.name)][str(test_graph.shape[0])].append(end - start)
+
+                    print("Running algorithm from full: " + str(algorithm.name))
                     
                     algorithm.reset([1] * test_envs[0].n_spins)
                     start = time.time()
@@ -251,6 +256,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
             for algorithm in random_algorithms:
                 if algorithm.name not in old_data or str(test_graph.shape[0]) not in old_data[algorithm.name]:
+                    print("Running algorithm: " + str(algorithm.name))
                     # setup sub-batches for randomized algorithms
                     solutions[algorithm.name][str(test_graph.shape[0])].append([])
                     times[algorithm.name][str(test_graph.shape[0])].append([])
@@ -270,21 +276,34 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             # This is specifically for max_ind_set
             # creates a partial solution then solves it using the neural net
             print("Running GECO on partial solution initial state.")
-            network_solver = Network(network=network, env=test_envs[0], name='network partial solution');
+            network_solver = Network(network=network, env=test_envs[0], name='network partial solution')
 
-            start = time.time()
-            vertices = np.array([-1] * test_envs[0].n_spins, dtype=np.float64)
-            matrix = test_envs[0].matrix 
+            if problem_type == 'max_ind_set':
+                start = time.time()
+                vertices = np.array([-1] * test_envs[0].n_spins, dtype=np.float64)
+                matrix = test_envs[0].matrix 
 
-            while np.any(network_solver.env.scorer.get_score_mask(vertices, matrix) > 0):
-                indexes = [i for i in range(len(vertices)) if network_solver.env.scorer.get_score_mask(vertices, matrix)[i] > 0]
-                index = random.choice(indexes)
-                vertices[index] = 1
+                while np.any(network_solver.env.scorer.get_score_mask(vertices, matrix) > 0):
+                    indexes = [i for i in range(len(vertices)) if network_solver.env.scorer.get_score_mask(vertices, matrix)[i] > 0]
+                    index = random.choice(indexes)
+                    vertices[index] = 1
 
-            network_solver.reset(vertices)
+                network_solver.reset(vertices)
 
-            network_solver.solve()
-            end = time.time()
+                network_solver.solve()
+                end = time.time()
+
+            if problem_type == 'min_cover':
+                matcher = CoverMatching(env=None, name='matching')
+
+                start = time.time()
+                matcher.set_env(test_envs[0])
+                matcher.reset()
+                matcher.solve()
+                network_solver = Network(network=network, env=test_envs[0], name='network partial solution')
+                network_solver.reset(test_envs[0].best_spins)
+                network_solver.solve()
+                end = time.time()
             
             # Once done, get best solution found into the batch
             solutions['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
@@ -357,7 +376,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
                 json.dump(histories[hist], f, indent=4, cls=NpEncoder)
 
 
-def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER', network_type='eco'):
+def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER', network_type='eco', stopping_type='normal'):
     if problem_type == 'min_cover':
         problem_params = {
             'optimisation': OptimisationTarget.MIN_COVER,
@@ -367,7 +386,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = [CplexSolver(env=None, name='cplex'), NetworkXMinCoverSolver(env=None, name='networkx')]
+        fixed_algorithms = [NetworkXMinCoverSolver(env=None, name='networkx')] #,CplexSolver(env=None, name='cplex')]
         stepped_algorithms = [Greedy(env=None, name='greedy')]
         random_algorithms = [Greedy(env=None, name='greedy random'), CoverMatching(env=None, name='matching')]
     elif problem_type == 'max_cut':
@@ -422,6 +441,13 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
         print('Invalid network type.')
         exit(1)
 
+    if stopping_type == 'normal':
+        problem_params['stopping'] = Stopping.NORMAL
+    elif stopping_type == 'early':
+        problem_params['stopping'] = Stopping.EARLY
+    elif stopping_type == 'quarter':
+        problem_params['stopping'] = Stopping.QUARTER
+
     run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms, random_algorithms, stepped_algorithms)
 
 
@@ -457,4 +483,5 @@ if __name__ == "__main__":
     graph_type = 'ER'
     problem_type = 'min_cover'
     network_type = 'eco'
-    run_with_params(num_vertices, problem_type, graph_type, network_type)
+    stopping_type = 'normal'
+    run_with_params(num_vertices, problem_type, graph_type, network_type, stopping_type)

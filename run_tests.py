@@ -1,13 +1,10 @@
 from experiments.test_eco import run_with_params 
 import sys
 
-if len(sys.argv) != 5:
-    num_verts = 20
-    problem_type = 'max_ind_set'
-    graph_type = 'ER'
-    network_type = 'eco'
+if len(sys.argv) != 6:
     print('Incorrect argument number') 
-    run_with_params(num_verts, problem_type, graph_type, network_type)
+    print('Usage: python run_tests vertex_count problem_type graph_type network_type stopping_type')
+    exit(1)
 
 self_filename = sys.argv[0]
 
@@ -31,4 +28,8 @@ if network_type not in ['eco', 's2v']:
     print('Invalid network type')
     exit(1)
 
-run_with_params(num_verts, problem_type, graph_type, network_type)
+stopping_type = sys.argv[5]
+if stopping_type not in ['normal', 'quarter', 'early']:
+    print('Invalid stopping type')
+
+run_with_params(num_verts, problem_type, graph_type, network_type, stopping_type)

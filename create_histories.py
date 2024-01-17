@@ -1,7 +1,7 @@
 import pandas as pd
 import json
 
-problem_type = 'max_ind_set'
+problem_type = 'min_cover'
 problem_init = ['empty', 'partial', 'full']
 training_graph_size = 20
 
@@ -34,10 +34,10 @@ for init in problem_init:
 
     for size in solution_data:
         for graph in solution_data[size]:
-            best_solution = 0
+            best_solution = 100000
             best_solution_step = 0
             first_solution = 0
-            last_solution = -1
+            last_solution = 0 
             valid_states = {}
             invalid_states = {}
             first_invalid_state = -1 
@@ -54,10 +54,10 @@ for init in problem_init:
                 qs = step[3]
                 spins = str(step[4])
                 score_mask = step[5]
-                validity = step[6]
+                validity = True if step[6] == 'True' else False
 
                 # setup dictionaries
-                if validity == 'True':
+                if validity:
                     if spins in valid_states:
                         valid_states[spins] += 1
                     else:
@@ -82,7 +82,7 @@ for init in problem_init:
                     local_opt += 1
 
                 # best_solution and step
-                if solution > best_solution:
+                if solution < best_solution:
                     best_solution = solution 
                     best_solution_step = index
                     best_found_local_opt = flag
@@ -92,7 +92,7 @@ for init in problem_init:
                 if index == 0:
                     first_solution = solution 
                 # last solution
-                if index == len(graph):
+                if index == len(graph) - 1:
                     last_solution = solution
                 # first and last invalid
                 if not validity and first_invalid_state == -1:
@@ -144,7 +144,7 @@ for init in problem_init:
                     repeated_actions,
                     local_opt,
                     best_found_local_opt,
-                    (len(graph) - 1) * 4,
+                    size,
             ]
             df.loc[len(df)] = row
 

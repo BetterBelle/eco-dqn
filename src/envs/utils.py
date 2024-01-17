@@ -7,8 +7,13 @@ import numpy as np
 import operator as op
 from numba import jit
 
-class EdgeType(Enum):
+class Stopping(Enum):
 
+    NORMAL = 1
+    QUARTER = 2
+    EARLY = 3
+
+class EdgeType(Enum):
     UNIFORM = 1
     DISCRETE = 2
     RANDOM = 3
