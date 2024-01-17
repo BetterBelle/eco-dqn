@@ -25,4 +25,5 @@ ER_[1-9]*spin
 *test_times*.txt
 
 # Ignore histories
-data/*_histories*.txt
+*histories*.txt
+code.zip
