@@ -12,9 +12,7 @@ with open('data/{}_test_times{}.txt'.format(problem_type, training_graph_size)) 
     solution_times = json.load(f)
 
 algorithms = list(solution_data.keys())
-print(algorithms)
 vert_counts = list(solution_data[algorithms[0]].keys())
-print(vert_counts)
 
 x = ["|V| = {}".format(i) for i in vert_counts]
 ind = np.arange(len(x))
