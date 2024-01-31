@@ -203,7 +203,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
                 'horizon_length': None,
                 'stag_punishment': None,
                 'basin_reward': 1. / test_graph.shape[0],
-                'reversible_spins': problem_params['reversible_spins']
+                'reversible_spins': problem_params['reversible_spins'],
+                'stopping': problem_params['stopping']
             }
             
             # Create the environments that the solvers will run on
