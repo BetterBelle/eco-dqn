@@ -1,9 +1,27 @@
 import pandas as pd
 import json
+import sys
 
-problem_type = 'min_cover'
+if len(sys.argv) != 3:
+    print('Incorrect argument number') 
+    print('Usage: python create_histories.py problem_type graph_size')
+    exit(1)
+
+self_filename = sys.argv[0]
+
+problem_type = sys.argv[1]
+if problem_type not in ['min_cover', 'max_ind_set', 'max_cut', 'min_cut']:
+    print('Invalid problem type')
+    print('Problem types: min_cover, max_ind_set, max_cut, min_cut')
+    exit(1)
+
+training_graph_size = sys.argv[2]
+if int(training_graph_size) not in [20, 40, 60, 80, 100, 200, 500, 1000, 2000]:
+    print('Invalid training graph size')
+    print('Graph sizes: 20, 40, 60, 80, 100, 200, 500, 1000, 2000')
+    exit(1)
+
 problem_init = ['empty', 'partial', 'full']
-training_graph_size = 20
 
 for init in problem_init:
     with open('data/{}_histories{}_neural network {} {}.txt'.format(problem_type, training_graph_size, init, training_graph_size)) as f:
@@ -34,7 +52,7 @@ for init in problem_init:
 
     for size in solution_data:
         for graph in solution_data[size]:
-            best_solution = 100000
+            best_solution = 1000000 if 'min' in problem_type else -100000
             best_solution_step = 0
             first_solution = 0
             last_solution = 0 
@@ -82,7 +100,7 @@ for init in problem_init:
                     local_opt += 1
 
                 # best_solution and step
-                if solution < best_solution:
+                if ('min' in problem_type and solution < best_solution) or ('max' in problem_type and solution > best_solution):
                     best_solution = solution 
                     best_solution_step = index
                     best_found_local_opt = flag

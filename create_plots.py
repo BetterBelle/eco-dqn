@@ -1,9 +1,26 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import json
+import sys
 
-problem_type = 'min_cover'
-training_graph_size = 20
+if len(sys.argv) != 3:
+    print('Incorrect argument number') 
+    print('Usage: python create_plots.py problem_type graph_size')
+    exit(1)
+
+self_filename = sys.argv[0]
+
+problem_type = sys.argv[1]
+if problem_type not in ['min_cover', 'max_ind_set', 'max_cut', 'min_cut']:
+    print('Invalid problem type')
+    print('Problem types: min_cover, max_ind_set, max_cut, min_cut')
+    exit(1)
+
+training_graph_size = sys.argv[2]
+if int(training_graph_size) not in [20, 40, 60, 80, 100, 200, 500, 1000, 2000]:
+    print('Invalid graph size')
+    print('Graph sizes: 20, 40, 60, 80, 100, 200, 500, 1000, 2000')
+    exit(1)
 
 with open('data/{}_test_data{}.txt'.format(problem_type, training_graph_size)) as f:
     solution_data = json.load(f)
@@ -41,9 +58,9 @@ else:
 if cplex_solutions != None:
     for alg in solution_data:
         for vert in solution_data[alg]:
-            if problem_type == 'max_ind_set' or problem_type == 'max_cut':
+            if 'max' in problem_type:
                 solution_data[alg][vert] = list(np.divide(cplex_solutions[vert], solution_data[alg][vert]))
-            elif problem_type == 'min_cover' or problem_type == 'min_cut':
+            elif 'min' in problem_type: 
                 solution_data[alg][vert] = list(np.divide(solution_data[alg][vert], cplex_solutions[vert]))
 
 # Now we get the average approximation ratio or solution for every sub-list
@@ -84,13 +101,15 @@ plt.clf()
 
 bars = []
 plt.figure(figsize=(20, 10))
-if 'neural network random {}'.format(str(training_graph_size)) in solution_times:
-    for vert in solution_times['neural network random {}'.format(str(training_graph_size))]:
-        solution_times['neural network random {}'.format(str(training_graph_size))][vert] = np.divide(solution_times['neural network random {}'.format(str(training_graph_size))][vert], 50)
 
-if 'neural network partial {}'.format(str(training_graph_size)) in solution_times:
-    for vert in solution_times['neural network partial {}'.format(str(training_graph_size))]:
-        solution_times['neural network partial {}'.format(str(training_graph_size))][vert] = np.divide(solution_times['neural network partial {}'.format(str(training_graph_size))][vert], 50)
+### UNCOMMENT ONLY WHEN PARTIAL/RANDOM SOLUTIONS RUN 50 TIMES
+# if 'neural network random {}'.format(str(training_graph_size)) in solution_times:
+#     for vert in solution_times['neural network random {}'.format(str(training_graph_size))]:
+#         solution_times['neural network random {}'.format(str(training_graph_size))][vert] = np.divide(solution_times['neural network random {}'.format(str(training_graph_size))][vert], 50)
+
+# if 'neural network partial {}'.format(str(training_graph_size)) in solution_times:
+#     for vert in solution_times['neural network partial {}'.format(str(training_graph_size))]:
+#         solution_times['neural network partial {}'.format(str(training_graph_size))][vert] = np.divide(solution_times['neural network partial {}'.format(str(training_graph_size))][vert], 50)
 
 for i, alg in enumerate(solution_times):
     next_data = []

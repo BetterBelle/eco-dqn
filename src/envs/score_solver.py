@@ -451,6 +451,14 @@ class MinimumCutUnbiasedSolver(MinimizationProblem):
         quality_mask = self.get_solution_quality_mask(np.array([-1] * len(spins), dtype=np.float64), matrix)
         without_zeros = quality_mask[np.nonzero(quality_mask)]
         self._max_local_reward = np.max(without_zeros)
+
+    def set_lower_bound(self, spins: npt.ArrayLike, matrix: npt.ArrayLike) -> None:
+        """
+        The lower bound to shift the quality. In case of min cut, that's the sum of
+        all negative edges. Therefore, we sum all edges that are negative, then divide
+        by two as we double count every edge.
+        """
+        self._lower_bound = min(0, np.sum(np.multiply(matrix, (matrix < 0))) / 2)
     
     def get_solution(self, spins: ArrayLike, matrix: ArrayLike) -> float:
         """
