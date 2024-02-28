@@ -281,6 +281,16 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
             'reward_signal': RewardSignal.BLS,
             'stopping': Stopping.NORMAL
         }
+    elif problem_type == 'min_dom_set':
+        problem_params = {
+            'optimisation': OptimisationTarget.MIN_DOM_SET,
+            'edge_type': EdgeType.UNIFORM,
+            'observables': MAIN_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1./num_vertices,
+            'reward_signal': RewardSignal.BLS,
+            'stopping': Stopping.NORMAL
+        }
     else:
         print('Invalid problem type.')
         exit(1)
