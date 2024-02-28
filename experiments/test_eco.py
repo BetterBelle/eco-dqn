@@ -387,9 +387,9 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = [NetworkXMinCoverSolver(env=None, name='networkx')] #,CplexSolver(env=None, name='cplex')]
+        fixed_algorithms = [NetworkXMinCoverSolver(env=None, name='networkx')] #, CplexSolver(env=None, name='cplex')]
         stepped_algorithms = [Greedy(env=None, name='greedy')]
-        random_algorithms = [Greedy(env=None, name='greedy random'), CoverMatching(env=None, name='matching')]
+        random_algorithms = [CoverMatching(env=None, name='matching')]
     elif problem_type == 'max_cut':
         problem_params = {
             'optimisation': OptimisationTarget.CUT,
@@ -427,6 +427,18 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
         fixed_algorithms = [NetworkXMaxIndSetSolver(env = None, name = 'networkx')]
         stepped_algorithms = []
         random_algorithms = []
+    elif problem_type == 'min_dom_set':
+        problem_params = {
+            'optimisation': OptimisationTarget.MIN_DOM_SET,
+            'edge_type': EdgeType.UNIFORM,
+            'observables': MAIN_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1./num_vertices,
+            'reward_signal': RewardSignal.BLS
+        }
+        fixed_algorithms = []
+        stepped_algorithms = []
+        random_algorithms = []
     else:
         print('Invalid problem type.')
         exit(1)
@@ -448,6 +460,9 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
         problem_params['stopping'] = Stopping.EARLY
     elif stopping_type == 'quarter':
         problem_params['stopping'] = Stopping.QUARTER
+    else:
+        print('Invalid stopping type.')
+        exit(1)
 
     run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms, random_algorithms, stepped_algorithms)
 
