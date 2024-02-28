@@ -158,7 +158,7 @@ class ScoreSolver(ABC):
         Get the validity bit for what happens on each vertex flip in spins.
         """
         # Because the invalidity_degree is the current invalidity degree and the invalidity_degree_mask is the change,
-        # (negative getting closer to validity), we can just add the current validity degree to the invalidity degree mask,
+        # (negative getting closer to validity), we can just add the current invalidity degree to the invalidity degree mask,
         # giving us the new degree of invalidity for each flip. Checking which ones are zeros gives us the bitmask for valid solutions.
         new_validity_degree = self.get_invalidity_degree(spins, matrix) + self.get_invalidity_degree_mask(spins, matrix)
         return new_validity_degree == 0
@@ -613,9 +613,123 @@ class MaximumIndependentSetUnbiasedSolver(MaximizationProblem):
         # Now we return the score on each vertex flip - the current score to get the update in score value on flip
         return normalized_scores - self.get_normalized_score(spins, matrix)
     
-class MaximumCliqueUnbiasedSolver(MaximizationProblem):
-    pass
+class MinimumDominatingSetSolver(MinimizationProblem):
+    """
+    Class representing the different functions required for determining scores of solutions, including validity and invalidity.
+    """
+    def __init__(self, problem_type: OptimisationTarget, is_biased_graph: bool):
+        super().__init__(problem_type, is_biased_graph)
 
+    def set_quality_normalizer(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
+        """
+        Quality normalizer for dominating set is the size of the graph
+        """
+        self._solution_quality_normalizer = len(spins)
+
+    def set_max_local_reward(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
+        """
+        The maximum reward would be the maximum negative invalidity and the maximum positive quality. 
+        In this case, this is simply 2 * the number of vertices as the max invalidity is the negative of the total number of vertices.
+        """
+        self._max_local_reward = 2 * len(spins)
+    
+    def set_invalidity_normalizer(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
+        """
+        Normalizing the invalidity degree is the number of vertices for the minimum dominating set
+        """
+        self._invalidity_normalizer = len(spins)
+
+    def set_lower_bound(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
+        """
+        The lower bound for minimum dominating set is just 0
+        """
+        self._lower_bound = 0
+    
+    def get_solution(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
+        """
+        The solution for the dominating set is the number of vertices in the solution or the number of vertices if the solution is invalid
+        """
+        if not self.is_valid(spins, matrix):
+            return len(spins)
+        
+        return np.sum(spins == 1)
+    
+    def _get_measure(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
+        """
+        Gets the measure of the solution without accounting for validity. 
+        """
+        return np.sum(spins == 1)
+    
+    def get_solution_quality_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> npt.NDArray:
+        """
+        Gets the solution quality (how good the solution is, irrespective of validity) for every single vertex if flipped.
+        For the minimum dominating set, the solution quality increases when choosing vertices that are already in the solution
+        and decreases when choosing vertices not in the solution, exactly like the minimum vertex cover.
+        """
+        return spins
+    
+    def get_invalidity_degree_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> npt.NDArray:
+        """
+        Gets the degree of invalidity for every spin if it was flipped. 
+        This is all done with respect to the passed in spins, so it is
+        a difference in invalidity with respect to the current spins.
+        """
+        # edges incident on the set
+        edges_incident_on_set = matrix * (spins == 1)
+        edges_incident_on_set += edges_incident_on_set.T
+        edges_incident_on_set = edges_incident_on_set > 0
+        # number of adjacent nodes that are adjacent to less than two nodes in the solution and are not in the solution
+        adj_lt_two = op.matmul(edges_incident_on_set, spins == 1) < 2
+        num_adj_lt_two_not_in_solution = op.matmul(matrix, adj_lt_two * (spins == -1))
+        # number of nodes that will no longer be in a dominating set if the node is removed from the set
+        removed_from_set_on_flip = (num_adj_lt_two_not_in_solution + (adj_lt_two * (spins == 1))) * (spins == 1)
+
+        not_adj_set = op.matmul(edges_incident_on_set, spins == 1) == 0
+        not_in_set = not_adj_set * (spins == -1)
+        num_adj_not_dom = op.matmul(matrix, not_in_set)
+        change_in_validity = (num_adj_not_dom + not_in_set + removed_from_set_on_flip) * spins
+        return change_in_validity
+    
+    def get_invalidity_degree(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
+        """
+        Invalidity degree for minimum dominating set is just the number of vertices that are not adjacent
+        to a node in the set
+        """
+        edges_incident_on_set = matrix * (spins == 1)
+        edges_incident_on_set += edges_incident_on_set.T
+        edges_incident_on_set = edges_incident_on_set > 0
+        nodes_not_incident_on_set = op.matmul(edges_incident_on_set, spins == 1) == 0
+        # by multiplying by the spins == -1, that removes any nodes that are not incident on a set but are in the set itself
+        return np.sum(nodes_not_incident_on_set * (spins == -1))
+    
+    def get_score_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> npt.NDArray:
+        """
+        Get the score for every spin flip. This is the difference in score from the current spins.
+        For the minimum dominating set, this is calculated the same as the minimum vertex cover
+        """
+        # Solution quality on each flip is just the current quality + the mask
+        # because solution quality ignores validity
+        updated_quality = self.get_solution_quality(spins, matrix) + self.get_solution_quality_mask(spins, matrix)
+        # Updated invalidity degree is just the current degree of invalidity + the mask
+        # this gives 0s for creating valid solutions
+        updated_invalidity = self.get_invalidity_degree(spins, matrix) + self.get_invalidity_degree_mask(spins, matrix)
+        scores = self.get_validity_mask(spins, matrix) * updated_quality - updated_invalidity
+        # Now we return the score on each vertex flip - the current score to get the update in score value on flip
+        return scores - self.get_score(spins, matrix)
+    
+    def get_normalized_score_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
+        """
+        Gets the score difference for every vertex, normalized.
+        """
+        updated_quality = self.get_solution_quality(spins, matrix) + self.get_solution_quality_mask(spins, matrix)
+        updated_quality /= self._solution_quality_normalizer
+
+        updated_invalidity = self.get_invalidity_degree(spins, matrix) + self.get_invalidity_degree_mask(spins, matrix)
+        updated_invalidity /= self._invalidity_normalizer
+
+        normalized_scores = self.get_validity_mask(spins, matrix) * updated_quality - updated_invalidity
+        # Now we return the score on each vertex flip - the current score to get the update in score value on flip
+        return normalized_scores - self.get_normalized_score(spins, matrix)
     
 
 class ScoreSolverFactory():
@@ -636,8 +750,11 @@ class ScoreSolverFactory():
         elif problem_type == env_utils.OptimisationTarget.MAX_IND_SET and not is_biased_graph:
             return MaximumIndependentSetUnbiasedSolver(problem_type, is_biased_graph)
         
-        elif problem_type == env_utils.OptimisationTarget.MAX_CLIQUE and not is_biased_graph:
-            return MaximumCliqueUnbiasedSolver(problem_type, is_biased_graph)
+        # elif problem_type == env_utils.OptimisationTarget.MAX_CLIQUE and not is_biased_graph:
+        #     return MaximumCliqueUnbiasedSolver(problem_type, is_biased_graph)
+
+        elif problem_type == env_utils.OptimisationTarget.MIN_DOM_SET and not is_biased_graph:
+            return MinimumDominatingSetSolver(problem_type, is_biased_graph)
         
         # If make it here, invalid target
         raise NotImplementedError("Invalid optimization target: %s and biased %s", problem_type, is_biased_graph)

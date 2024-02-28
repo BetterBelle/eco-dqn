@@ -32,13 +32,13 @@ class ExtraAction(Enum):
     NONE = 3
 
 class OptimisationTarget(Enum):
-
     CUT = 1
     ENERGY = 2
     MIN_COVER = 3
     MIN_CUT = 4
     MAX_IND_SET = 5
     MAX_CLIQUE = 6
+    MIN_DOM_SET = 7
 
 class SpinBasis(Enum):
 
