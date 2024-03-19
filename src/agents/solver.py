@@ -279,6 +279,7 @@ class CoverMatching(SpinSolver):
 
     def step(self):
         rew = 0 ### Because the solve function needs this
+        done = False
         spins = self.env.state[0, :self.env.n_spins]
         matrix = self.env.matrix
 
@@ -317,7 +318,7 @@ class CplexSolver(SpinSolver):
         ### Generate the problem parameters
         if self.env.optimisation_target == OptimisationTarget.MIN_COVER:
             self._solver = Model('Minimum Vertex Cover')
-            variables = self._solver.continuous_var_list(len(self.env.matrix), 0, 1, 'x')
+            variables = self._solver.integer_var_list(len(self.env.matrix), 0, 1, 'x')
 
             for i in range(len(self.env.matrix)):
                 # Don't double count edges, so start from index i in the row
@@ -339,7 +340,31 @@ class CplexSolver(SpinSolver):
             self._solver.maximize(self._solver.sum(variables))
             self.measure = 0
 
-    def solve(self):
+        if self.env.optimisation_target == OptimisationTarget.MIN_DOM_SET:
+            self._solver = Model('Minimum Dominating Set')
+            variables = self._solver.integer_var_list(len(self.env.matrix), 0, 1, 'x')
+            for i in range(len(self.env.matrix)):
+                neighbours = []
+                for j in range(i, len(self.env.matrix[i])):
+                    if self.env.matrix[i][j] == 1:
+                        neighbours.append(variables[j])
+                self._solver.add_constraint(variables[i] + self._solver.sum(neighbours) >= 1, 'x_{} + neighbours >= 1'.format(i))
+
+            self._solver.minimize(self._solver.sum(variables))
+            self.measure = len(self.env.matrix)
+
+        if self.env.optimisation_target == OptimisationTarget.MAX_CLIQUE:
+            self._solver = Model('Maximum Clique')
+            variables = self._solver.integer_var_list(len(self.env.matrix), 0, 1, 'x')
+            for i in range(len(self.env.matrix)):
+                for j in range(i, len(self.env.matrix[i])):
+                    if self.env.matrix[i][j] == 0:
+                        self._solver.add_constraint(variables[i] + variables[j] <= 1, 'x_{} + x_{} <= 1'.format(i, j))
+
+            self._solver.maximize(self._solver.sum(variables))
+            self.measure = 0
+
+    def solve(self, *args):
         self._solver.solve()
         self._solver.print_information()
         print(self._solver.solution)
@@ -352,15 +377,27 @@ class CplexSolver(SpinSolver):
         """
         raise NotImplementedError
     
-class NetworkXMinCoverSolver(SpinSolver):
+class NetworkXSolver(SpinSolver):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def solve(self):
+    def solve(self, *args):
         """
         I'm going to assume the solution given is valid. Therefore measure is simply the size of the solution.
         """
-        solution = list(nx.algorithms.approximation.min_weighted_vertex_cover(nx.Graph(self.env.matrix)))
+        solution = []
+        if self.env.optimisation_target == OptimisationTarget.MIN_COVER:
+            solution = list(nx.algorithms.approximation.min_weighted_vertex_cover(nx.Graph(self.env.matrix)))
+        elif self.env.optimisation_target == OptimisationTarget.MAX_IND_SET:
+            solution = list(nx.algorithms.approximation.maximum_independent_set(nx.Graph(self.env.matrix)))
+        elif self.env.optimisation_target == OptimisationTarget.MIN_DOM_SET:
+            solution = list(nx.algorithms.approximation.min_weighted_dominating_set(nx.Graph(self.env.matrix)))
+        elif self.env.optimisation_target == OptimisationTarget.MAX_CLIQUE:
+            solution = list(nx.algorithms.approximation.max_clique(nx.Graph(self.env.matrix)))
+        else:
+            print("Invalid problem type for NetworkX")
+            exit(1)
+
         # Solution for this is all the chosen nodes, therefore the length is the measure
         self.measure = len(solution)
     
@@ -370,19 +407,3 @@ class NetworkXMinCoverSolver(SpinSolver):
         """
         raise NotImplementedError
     
-class NetworkXMaxIndSetSolver(SpinSolver):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def solve(self):
-        """
-        I'm going to assume the solution is valid. Therefore the measure is simply the size of the solution.
-        """
-        solution = list(nx.algorithms.approximation.maximum_independent_set(nx.Graph(self.env.matrix)))
-        self.measure = len(solution)
-
-    def step(self, *args):
-        """
-        Unneeded for networkx solver.
-        """
-        raise NotImplementedError

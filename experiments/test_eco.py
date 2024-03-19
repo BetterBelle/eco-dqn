@@ -100,7 +100,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
     # LOAD VALIDATION GRAPHS
     ####################################################
 
-    graph_sizes = [20, 40, 60, 80, 100, 200, 500]
+    graph_sizes = [20, 40, 60, 80, 100]
     all_graphs = []
 
     ### TODO modify this to work with BA graphs as well
@@ -143,7 +143,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
     ### Forcing cplex to be the first because it's fixed
     solutions = {}
     times = {}
-    histories = {}
+    # histories = {}
 
     batch_size = 50
     for algorithm in fixed_algorithms + random_algorithms:
@@ -158,11 +158,11 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
     solutions['neural network empty {}'.format(num_vertices)] = {}
     times['neural network empty {}'.format(num_vertices)] = {}
-    histories['neural network empty {}'.format(num_vertices)] = {}
+    # histories['neural network empty {}'.format(num_vertices)] = {}
 
     solutions['neural network full {}'.format(num_vertices)] = {}
     times['neural network full {}'.format(num_vertices)] = {}
-    histories['neural network full {}'.format(num_vertices)] = {}
+    # histories['neural network full {}'.format(num_vertices)] = {}
 
     # solutions['neural network random {}'.format(num_vertices)] = {}
     # times['neural network random {}'.format(num_vertices)] = {}
@@ -170,7 +170,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
     solutions['neural network partial {}'.format(num_vertices)] = {}
     times['neural network partial {}'.format(num_vertices)] = {}
-    histories['neural network partial {}'.format(num_vertices)] = {}
+    # histories['neural network partial {}'.format(num_vertices)] = {}
 
 
 
@@ -187,9 +187,9 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             if algorithm in old_times and str(graphs[0].shape[0]) in old_data[algorithm]:
                 times[algorithm][str(graphs[0].shape[0])] = old_times[algorithm][str(graphs[0].shape[0])]
 
-        histories['neural network partial {}'.format(num_vertices)][str(graphs[0].shape[0])] = []
-        histories['neural network empty {}'.format(num_vertices)][str(graphs[0].shape[0])] = []
-        histories['neural network full {}'.format(num_vertices)][str(graphs[0].shape[0])] = []
+        # histories['neural network partial {}'.format(num_vertices)][str(graphs[0].shape[0])] = []
+        # histories['neural network empty {}'.format(num_vertices)][str(graphs[0].shape[0])] = []
+        # histories['neural network full {}'.format(num_vertices)][str(graphs[0].shape[0])] = []
 
         for j, test_graph in enumerate(graphs):
             env_args = {
@@ -309,8 +309,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             # Once done, get best solution found into the batch
             solutions['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
             times['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
-            if len(histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
-                histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
+            # if len(histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
+            #     histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
 
 
             # Solve from empty state
@@ -323,8 +323,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             end = time.time()
             solutions['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
             times['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
-            if len(histories['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
-                histories['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
+            # if len(histories['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
+            #     histories['neural network empty {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
 
             # Solve from full state
             print("Running GECO on full initial state")
@@ -336,8 +336,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             end = time.time()
             solutions['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
             times['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
-            if len(histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
-                histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
+            # if len(histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
+            #     histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
 
             # # Next test network from random state (run 50 tests on each graph)
             # print("Running GECO on random inital state.")
@@ -372,9 +372,9 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
         with open("data/{}_test_times{}.txt".format(problem_type, num_vertices), 'w') as f:
             json.dump(times, f, indent=4, cls=NpEncoder)
 
-        for hist in histories:
-            with open("data/{}_histories{}_{}.txt".format(problem_type, num_vertices, hist), 'w') as f:
-                json.dump(histories[hist], f, indent=4, cls=NpEncoder)
+        # for hist in histories:
+        #     with open("data/{}_histories{}_{}.txt".format(problem_type, num_vertices, hist), 'w') as f:
+        #         json.dump(histories[hist], f, indent=4, cls=NpEncoder)
 
 
 def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER', network_type='eco', stopping_type='normal'):
@@ -387,7 +387,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = [NetworkXMinCoverSolver(env=None, name='networkx')] #, CplexSolver(env=None, name='cplex')]
+        fixed_algorithms = [NetworkXSolver(env=None, name='networkx'), CplexSolver(env=None, name='cplex')]
         stepped_algorithms = [Greedy(env=None, name='greedy')]
         random_algorithms = [CoverMatching(env=None, name='matching')]
     elif problem_type == 'max_cut':
@@ -423,8 +423,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        # Not doing CPLEX yet for time purposes
-        fixed_algorithms = [NetworkXMaxIndSetSolver(env = None, name = 'networkx')]
+        fixed_algorithms = [NetworkXSolver(env = None, name = 'networkx'), CplexSolver(env = None, name = 'cplex')]
         stepped_algorithms = []
         random_algorithms = []
     elif problem_type == 'min_dom_set':
@@ -436,7 +435,19 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = []
+        fixed_algorithms = [NetworkXSolver(env = None, name = 'networkx'), CplexSolver(env = None, name = 'cplex')]
+        stepped_algorithms = []
+        random_algorithms = []
+    elif problem_type == 'max_clique':
+        problem_params = {
+            'optimisation': OptimisationTarget.MAX_CLIQUE,
+            'edge_type': EdgeType.UNIFORM,
+            'observables': MAIN_OBSERVABLES,
+            'reversible_spins': True,
+            'basin_reward': 1./num_vertices,
+            'reward_signal': RewardSignal.BLS
+        }
+        fixed_algorithms = [NetworkXSolver(env = None, name = 'networkx'), CplexSolver(env = None, name = 'cplex')]
         stepped_algorithms = []
         random_algorithms = []
     else:

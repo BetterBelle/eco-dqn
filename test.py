@@ -40,20 +40,24 @@ adjacency_matrix = np.array([
     [1, 1, 0, 0, 1, 0]
     ], dtype=np.float64)
 
-spins = np.array([-1., -1., -1., -1., -1., 1.], dtype=np.float64)
+spins = np.array([-1., -1., 1., -1., 1., 1.], dtype=np.float64)
 vals = - spins * op.matmul(adjacency_matrix * np.array(spins == 1, dtype=np.float64), spins)
 val = np.sum(adjacency_matrix * np.array([spins == 1]) * np.array([spins == 1]).T) / 2
-solver = ss.ScoreSolverFactory.get(OptimisationTarget.MIN_DOM_SET, False)
+solver = ss.ScoreSolverFactory.get(OptimisationTarget.MAX_CLIQUE, False)
 solver.set_lower_bound(spins, adjacency_matrix)
 solver.set_max_local_reward(spins, adjacency_matrix)
 solver.set_quality_normalizer(spins, adjacency_matrix)
 solver.set_invalidity_normalizer(spins, adjacency_matrix)
+print('Invalidity mask')
 print(solver.get_invalidity_degree_mask(spins, adjacency_matrix))
+print('Invalidity degree')
 print(solver.get_invalidity_degree(spins, adjacency_matrix))
+print('Validity mask')
 print(solver.get_validity_mask(spins, adjacency_matrix))
+print('Score')
 print(solver.get_score(spins, adjacency_matrix))
+print('Score mask')
 print(solver.get_score_mask(spins, adjacency_matrix))
-print(solver.get_normalized_score_mask(spins, adjacency_matrix))
 
 graph = nx.Graph(adjacency_matrix)
 nx.draw_networkx(graph)

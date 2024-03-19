@@ -731,6 +731,122 @@ class MinimumDominatingSetSolver(MinimizationProblem):
         # Now we return the score on each vertex flip - the current score to get the update in score value on flip
         return normalized_scores - self.get_normalized_score(spins, matrix)
     
+class MaximumCliqueUnbiasedSolver(MaximizationProblem):
+    """
+    Class representing the different functions required for determining scores of solutions, including validity and invalidity.
+    """
+    def __init__(self, problem_type: OptimisationTarget, is_biased_graph: bool):
+        super().__init__(problem_type, is_biased_graph)
+
+    def set_quality_normalizer(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
+        """
+        Quality normalizer for maximum clique is the size of the graph
+        """
+        self._solution_quality_normalizer = len(spins)
+
+    def set_max_local_reward(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
+        """
+        The maximum reward would be the maximum negative invalidity and the maximum positive quality. 
+        In the maximum clique, the maximum reward should be at most the number of nodes in the graph. 
+        """
+        self._max_local_reward = len(spins)
+    
+    def set_invalidity_normalizer(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
+        """
+        For the maximum clique, the largest invalidity possible is the sum of the degrees of every node.
+        This is the same as two times the number of edges in the matrix.
+        """
+        self._invalidity_normalizer = sum(matrix)
+
+    def set_lower_bound(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
+        """
+        The lower bound for maximum clique is just 0
+        """
+        self._lower_bound = 0
+    
+    def get_solution(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
+        """
+        The solution for the maximum clique is the number of vertices in the solution or 0 if the solution is invalid
+        """
+        if not self.is_valid(spins, matrix):
+            return 0
+        
+        return np.sum(spins == 1)
+    
+    def _get_measure(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
+        """
+        Gets the measure of the solution without accounting for validity. 
+        """
+        return np.sum(spins == 1)
+    
+    def get_solution_quality_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> npt.NDArray:
+        """
+        Gets the solution quality (how good the solution is, irrespective of validity) for every single vertex if flipped.
+        For the maximum clique, the solution quality increases when choosing vertices that are not in the solution
+        and decreases when choosing vertices that are in the solution.
+        This is just the negative of the spins.
+        """
+        return - spins
+    
+    def get_invalidity_degree_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> npt.NDArray:
+        """
+        Gets the degree of invalidity for every spin if it was flipped. 
+        This is all done with respect to the passed in spins, so it is
+        a difference in invalidity with respect to the current spins.
+        """
+        new_invalidities = []
+        new_sets = []
+        current_set_size = sum(spins == 1)
+        for i in range(len(spins)):
+            temp = spins.copy()
+            temp[i] = -temp[i]
+            new_sets.append(temp)
+            new_invalidities.append((current_set_size + temp[i] - 1 - op.matmul(matrix, (temp == 1))) * (temp == 1))
+        new_invalidities = np.array(new_invalidities, dtype=np.float64)
+        new_sets = np.array(new_sets, dtype=np.float64)
+
+        return np.sum(new_invalidities, axis=1) - self.get_invalidity_degree(spins, matrix)
+    
+    def get_invalidity_degree(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
+        """
+        Invalidity degree for maximum clique is the sum of the differences between the number of
+        nodes in the set minus one and the number of nodes adjacent to each node.
+        For example, if there are 3 nodes in the set and two of the nodes are only adjacent
+        to one other node in the set, that increases the invalidity to 2.
+        """
+        nodes_in_set_adjacent = op.matmul(matrix, spins == 1)
+        target_degree = sum(spins == 1) - 1
+        invalidities = target_degree - nodes_in_set_adjacent
+        return sum(invalidities * (spins == 1))
+    
+    def get_score_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> npt.NDArray:
+        """
+        Get the score for every spin flip. This is the difference in score from the current spins.
+        For the maximum clique, we can calculate this the same way as was done in minimum vertex cover.
+        """
+        # Solution quality on each flip is just the current quality + the mask
+        # because solution quality ignores validity
+        updated_quality = self.get_solution_quality(spins, matrix) + self.get_solution_quality_mask(spins, matrix)
+        # Updated invalidity degree is just the current degree of invalidity + the mask
+        # this gives 0s for creating valid solutions
+        updated_invalidity = self.get_invalidity_degree(spins, matrix) + self.get_invalidity_degree_mask(spins, matrix)
+        scores = self.get_validity_mask(spins, matrix) * updated_quality - updated_invalidity
+        # Now we return the score on each vertex flip - the current score to get the update in score value on flip
+        return scores - self.get_score(spins, matrix)
+    
+    def get_normalized_score_mask(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
+        """
+        Gets the score difference for every vertex, normalized.
+        """
+        updated_quality = self.get_solution_quality(spins, matrix) + self.get_solution_quality_mask(spins, matrix)
+        updated_quality /= self._solution_quality_normalizer
+
+        updated_invalidity = self.get_invalidity_degree(spins, matrix) + self.get_invalidity_degree_mask(spins, matrix)
+        updated_invalidity /= self._invalidity_normalizer
+
+        normalized_scores = self.get_validity_mask(spins, matrix) * updated_quality - updated_invalidity
+        # Now we return the score on each vertex flip - the current score to get the update in score value on flip
+        return normalized_scores - self.get_normalized_score(spins, matrix)
 
 class ScoreSolverFactory():
     @staticmethod
@@ -750,8 +866,8 @@ class ScoreSolverFactory():
         elif problem_type == env_utils.OptimisationTarget.MAX_IND_SET and not is_biased_graph:
             return MaximumIndependentSetUnbiasedSolver(problem_type, is_biased_graph)
         
-        # elif problem_type == env_utils.OptimisationTarget.MAX_CLIQUE and not is_biased_graph:
-        #     return MaximumCliqueUnbiasedSolver(problem_type, is_biased_graph)
+        elif problem_type == env_utils.OptimisationTarget.MAX_CLIQUE and not is_biased_graph:
+            return MaximumCliqueUnbiasedSolver(problem_type, is_biased_graph)
 
         elif problem_type == env_utils.OptimisationTarget.MIN_DOM_SET and not is_biased_graph:
             return MinimumDominatingSetSolver(problem_type, is_biased_graph)
