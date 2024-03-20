@@ -11,9 +11,9 @@ if len(sys.argv) != 3:
 self_filename = sys.argv[0]
 
 problem_type = sys.argv[1]
-if problem_type not in ['min_cover', 'max_ind_set', 'max_cut', 'min_cut']:
+if problem_type not in ['min_cover', 'max_ind_set', 'max_cut', 'min_cut', 'min_dom_set', 'max_clique']:
     print('Invalid problem type')
-    print('Problem types: min_cover, max_ind_set, max_cut, min_cut')
+    print('Problem types: min_cover, max_ind_set, max_cut, min_cut, min_dom_set, max_clique')
     exit(1)
 
 training_graph_size = sys.argv[2]
@@ -87,9 +87,21 @@ for i, alg in enumerate(solution_data):
         plt.text(j + i * width, solution_data[alg][vert], round(solution_data[alg][vert], 2), ha='center', fontsize=8)
 
 
+problem_name = 'Independent Set'
+if problem_type == 'min_cover':
+    problem_name = 'Vertex Cover'
+if problem_type == 'max_ind_set':
+    problem_name = 'Independent Set'
+if problem_type == 'max_cut' or problem_type == 'min_cut':
+    problem_name = 'Cut'
+if problem_type == 'min_dom_set':
+    problem_name = 'Dominating Set'
+if problem_type == 'max_clique':
+    problem_name = 'Clique'
+
 plt.xlabel("Validation Graph Size")
 plt.ylabel("Mean Set Size")
-plt.title("Mean Independent Set Size by Algorithm on Validation Graphs (Erdős-Rényi; p=0.15)")
+plt.title("Mean {} Size by Algorithm on Validation Graphs (Erdős-Rényi; p=0.15)".format(problem_name))
 plt.xticks(ind + width * len(solution_data) / 2, x)
 plt.legend(tuple(bars), tuple(algorithms))
 plt.savefig('{}_test{}.png'.format(problem_type, training_graph_size))
@@ -125,7 +137,7 @@ for i, alg in enumerate(solution_times):
 
 plt.xlabel("Validation Graph Size")
 plt.ylabel("Mean Time to Solve")
-plt.title("Mean Time to Solve by Algorithm on Validation Graphs (Erdős-Rényi; p=0.15)")
+plt.title("Mean Time to Solve {} by Algorithm on Validation Graphs (Erdős-Rényi; p=0.15)".format(problem_name))
 plt.xticks(ind + width * len(solution_times) / 2, x)
 plt.legend(tuple(bars), tuple(algorithms))
 plt.savefig('{}_test_times{}.png'.format(problem_type, training_graph_size))
