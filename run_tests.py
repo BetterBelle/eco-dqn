@@ -14,7 +14,7 @@ if num_verts not in [20, 40, 60, 100, 200]:
     exit(1)
 
 problem_type = sys.argv[2]
-if problem_type not in ['max_ind_set', 'min_cover', 'max_cut', 'min_cut']:
+if problem_type not in ['max_ind_set', 'min_cover', 'max_cut', 'min_cut', 'max_clique', 'min_dom_set']:
     print('Invalid problem type')
     exit(1) 
 

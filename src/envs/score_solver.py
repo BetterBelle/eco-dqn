@@ -756,7 +756,7 @@ class MaximumCliqueUnbiasedSolver(MaximizationProblem):
         For the maximum clique, the largest invalidity possible is the sum of the degrees of every node.
         This is the same as two times the number of edges in the matrix.
         """
-        self._invalidity_normalizer = sum(matrix)
+        self._invalidity_normalizer = np.sum(matrix)
 
     def set_lower_bound(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> None:
         """
