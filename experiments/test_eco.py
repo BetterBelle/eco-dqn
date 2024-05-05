@@ -168,8 +168,8 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
     # times['neural network random {}'.format(num_vertices)] = {}
     # histories['neural network random {}'.format(num_vertices)] = {}
 
-    solutions['neural network partial {}'.format(num_vertices)] = {}
-    times['neural network partial {}'.format(num_vertices)] = {}
+    # solutions['neural network partial {}'.format(num_vertices)] = {}
+    # times['neural network partial {}'.format(num_vertices)] = {}
     # histories['neural network partial {}'.format(num_vertices)] = {}
 
 
@@ -276,45 +276,46 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
             # This is specifically for max_ind_set
             # creates a partial solution then solves it using the neural net
-            print("Running GECO on partial solution initial state.")
-            network_solver = Network(network=network, env=test_envs[0], name='network partial solution')
+            # print("Running GECO on partial solution initial state.")
+            # network_solver = Network(network=network, env=test_envs[0], name='network partial solution')
 
-            if problem_type == 'max_ind_set':
-                start = time.time()
-                vertices = np.array([-1] * test_envs[0].n_spins, dtype=np.float64)
-                matrix = test_envs[0].matrix 
+            # if problem_type == 'max_ind_set':
+            #     start = time.time()
+            #     vertices = np.array([-1] * test_envs[0].n_spins, dtype=np.float64)
+            #     matrix = test_envs[0].matrix 
 
-                while np.any(network_solver.env.scorer.get_score_mask(vertices, matrix) > 0):
-                    indexes = [i for i in range(len(vertices)) if network_solver.env.scorer.get_score_mask(vertices, matrix)[i] > 0]
-                    index = random.choice(indexes)
-                    vertices[index] = 1
+            #     while np.any(network_solver.env.scorer.get_score_mask(vertices, matrix) > 0):
+            #         indexes = [i for i in range(len(vertices)) if network_solver.env.scorer.get_score_mask(vertices, matrix)[i] > 0]
+            #         index = random.choice(indexes)
+            #         vertices[index] = 1
 
-                network_solver.reset(vertices)
+            #     network_solver.reset(vertices)
 
-                network_solver.solve()
-                end = time.time()
+            #     network_solver.solve()
+            #     end = time.time()
 
-            if problem_type == 'min_cover':
-                matcher = CoverMatching(env=None, name='matching')
+            # if problem_type == 'min_cover':
+            #     matcher = CoverMatching(env=None, name='matching')
 
-                start = time.time()
-                matcher.set_env(test_envs[0])
-                matcher.reset()
-                matcher.solve()
-                network_solver = Network(network=network, env=test_envs[0], name='network partial solution')
-                network_solver.reset(test_envs[0].best_spins)
-                network_solver.solve()
-                end = time.time()
+            #     start = time.time()
+            #     matcher.set_env(test_envs[0])
+            #     matcher.reset()
+            #     matcher.solve()
+            #     network_solver = Network(network=network, env=test_envs[0], name='network partial solution')
+            #     network_solver.reset(test_envs[0].best_spins)
+            #     network_solver.solve()
+            #     end = time.time()
             
-            # Once done, get best solution found into the batch
-            solutions['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
-            times['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
+            # # Once done, get best solution found into the batch
+            # solutions['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(test_envs[0].best_solution)
+            # times['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
             # if len(histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
             #     histories['neural network partial {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
 
 
             # Solve from empty state
             print("Running GECO on empty initial state")
+            network_solver = Network(network=network, env=test_envs[0], name='network empty solution')
             start = time.time()
 
             network_solver.reset(np.array([-1] * test_envs[0].n_spins, dtype=np.float64))
@@ -328,6 +329,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
             # Solve from full state
             print("Running GECO on full initial state")
+            network_solver = Network(network=network, env=test_envs[0], name='network full solution')
 
             start = time.time()
             network_solver.reset(np.array([1] * test_envs[0].n_spins, dtype=np.float64))
@@ -387,8 +389,8 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = [NetworkXSolver(env=None, name='networkx'), CplexSolver(env=None, name='cplex')]
-        stepped_algorithms = [Greedy(env=None, name='greedy')]
+        fixed_algorithms = [CplexSolver(env=None, name='cplex'), NetworkXSolver(env=None, name='networkx')]
+        stepped_algorithms = []
         random_algorithms = [CoverMatching(env=None, name='matching')]
     elif problem_type == 'max_cut':
         problem_params = {
@@ -423,7 +425,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = [NetworkXSolver(env = None, name = 'networkx'), CplexSolver(env = None, name = 'cplex')]
+        fixed_algorithms = [CplexSolver(env = None, name = 'cplex'), NetworkXSolver(env = None, name = 'networkx')]
         stepped_algorithms = []
         random_algorithms = []
     elif problem_type == 'min_dom_set':
@@ -435,7 +437,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = [NetworkXSolver(env = None, name = 'networkx'), CplexSolver(env = None, name = 'cplex')]
+        fixed_algorithms = [CplexSolver(env = None, name = 'cplex'), NetworkXSolver(env = None, name = 'networkx')]
         stepped_algorithms = []
         random_algorithms = []
     elif problem_type == 'max_clique':
@@ -447,7 +449,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS
         }
-        fixed_algorithms = [NetworkXSolver(env = None, name = 'networkx'), CplexSolver(env = None, name = 'cplex')]
+        fixed_algorithms = [CplexSolver(env = None, name = 'cplex'), NetworkXSolver(env = None, name = 'networkx')]
         stepped_algorithms = []
         random_algorithms = []
     else:

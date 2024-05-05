@@ -613,6 +613,7 @@ class MaximumIndependentSetUnbiasedSolver(MaximizationProblem):
         # Now we return the score on each vertex flip - the current score to get the update in score value on flip
         return normalized_scores - self.get_normalized_score(spins, matrix)
     
+
 class MinimumDominatingSetSolver(MinimizationProblem):
     """
     Class representing the different functions required for determining scores of solutions, including validity and invalidity.
@@ -674,20 +675,28 @@ class MinimumDominatingSetSolver(MinimizationProblem):
         This is all done with respect to the passed in spins, so it is
         a difference in invalidity with respect to the current spins.
         """
-        # edges incident on the set
-        edges_incident_on_set = matrix * (spins == 1)
-        edges_incident_on_set += edges_incident_on_set.T
-        edges_incident_on_set = edges_incident_on_set > 0
-        # number of adjacent nodes that are adjacent to less than two nodes in the solution and are not in the solution
-        adj_lt_two = op.matmul(edges_incident_on_set, spins == 1) < 2
-        num_adj_lt_two_not_in_solution = op.matmul(matrix, adj_lt_two * (spins == -1))
-        # number of nodes that will no longer be in a dominating set if the node is removed from the set
-        removed_from_set_on_flip = (num_adj_lt_two_not_in_solution + (adj_lt_two * (spins == 1))) * (spins == 1)
+        # # edges incident on the set
+        # edges_incident_on_set = matrix * (spins == 1)
+        # edges_incident_on_set += edges_incident_on_set.T
+        # edges_incident_on_set = edges_incident_on_set > 0
+        # # number of adjacent nodes that are adjacent to less than two nodes in the solution and are not in the solution
+        # adj_lt_two = op.matmul(edges_incident_on_set, spins == 1) < 2
+        # num_adj_lt_two_not_in_solution = op.matmul(matrix, adj_lt_two * (spins == -1))
+        # # number of nodes that will no longer be in a dominating set if the node is removed from the set
+        # removed_from_set_on_flip = (num_adj_lt_two_not_in_solution + (adj_lt_two * (spins == 1))) * (spins == 1)
 
-        not_adj_set = op.matmul(edges_incident_on_set, spins == 1) == 0
-        not_in_set = not_adj_set * (spins == -1)
-        num_adj_not_dom = op.matmul(matrix, not_in_set)
-        change_in_validity = (num_adj_not_dom + not_in_set + removed_from_set_on_flip) * spins
+        # not_adj_set = op.matmul(edges_incident_on_set, spins == 1) == 0
+        # not_in_set = not_adj_set * (spins == -1)
+        # num_adj_not_dom = op.matmul(matrix, not_in_set)
+        # change_in_validity = (num_adj_not_dom + not_in_set + removed_from_set_on_flip) * spins
+        new_invalidities = []
+        for idx, item in enumerate(spins):
+            new_spins = spins.copy()
+            new_spins[idx] = -new_spins[idx]
+            new_invalidities.append(self.get_invalidity_degree(new_spins, matrix))
+
+        current_invalidity = self.get_invalidity_degree(spins, matrix)
+        change_in_validity = new_invalidities - current_invalidity  
         return change_in_validity
     
     def get_invalidity_degree(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:

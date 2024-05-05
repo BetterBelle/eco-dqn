@@ -51,7 +51,7 @@ for alg in solution_times:
 
 # Now we create approximation ratios with respect to the cplex solutions (always first in dict)
 if 'cplex' in solution_data:
-    cplex_solutions = solution_data['cplex']
+    cplex_solutions = solution_data['cplex'].copy()
 else:
     cplex_solutions = None
 
@@ -59,8 +59,21 @@ if cplex_solutions != None:
     for alg in solution_data:
         for vert in solution_data[alg]:
             if 'max' in problem_type:
-                solution_data[alg][vert] = list(np.divide(cplex_solutions[vert], solution_data[alg][vert]))
+                print('========= CPLEX ============')
+                print('size: {}, graph: {}'.format(len(cplex_solutions[vert]), vert))
+                print(cplex_solutions[vert])
+                print('======== SOL DATA ========')
+                print('size: {}, graph: {}'.format(len(solution_data[alg][vert]), vert))
+                print('algorithm: {}'.format(alg))
+                solution_data[alg][vert] = list(np.divide(cplex_solutions[vert], [1 if item == 0 else item for item in solution_data[alg][vert]]))
             elif 'min' in problem_type: 
+                print('========= CPLEX ============')
+                print('size: {}, graph: {}'.format(len(cplex_solutions[vert]), vert))
+                print(cplex_solutions[vert])
+                print('======== SOL DATA ========')
+                print('size: {}, graph: {}'.format(len(solution_data[alg][vert]), vert))
+                print('algorithm: {}'.format(alg))
+                print(solution_data[alg][vert])
                 solution_data[alg][vert] = list(np.divide(solution_data[alg][vert], cplex_solutions[vert]))
 
 # Now we get the average approximation ratio or solution for every sub-list

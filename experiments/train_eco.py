@@ -264,8 +264,8 @@ def run_with_vars(num_vertices=20, problem_type='min_cover', graph_type='ER', ne
     elif problem_type == 'max_clique':
         problem_params = {
             'optimisation': OptimisationTarget.MAX_CLIQUE,
-            'edge_type': EdgeType.DISCRETE,
-            'observables': DEFAULT_OBSERVABLES,
+            'edge_type': EdgeType.UNIFORM,
+            'observables': MAIN_OBSERVABLES,
             'reversible_spins': True,
             'basin_reward': 1./num_vertices,
             'reward_signal': RewardSignal.BLS,
