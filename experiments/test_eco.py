@@ -33,9 +33,9 @@ class NpEncoder(json.JSONEncoder):
             return str(obj)
         return super(NpEncoder, self).default(obj)
 
-def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms : list[SpinSolver], random_algorithms : list[SpinSolver], stepped_algorithms : list[SpinSolver]):
+def run(num_vertices, problem_type, graph_train_type, graph_test_type, problem_params, fixed_algorithms : list[SpinSolver], random_algorithms : list[SpinSolver], stepped_algorithms : list[SpinSolver]):
     
-    save_loc = '{}_{}spin/eco/{}'.format(graph_type, num_vertices, problem_type)
+    save_loc = '{}_{}spin/eco/{}'.format(graph_train_type, num_vertices, problem_type)
 
     print("\n----- Running {} -----\n".format(os.path.basename(__file__)))
 
@@ -103,9 +103,10 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
     graph_sizes = [20, 40, 60, 80, 100]
     all_graphs = []
 
-    ### TODO modify this to work with BA graphs as well
+    graph_connection_parameter = 'p15' if graph_test_type == 'ER' else 'm4'
+
     for i in graph_sizes:
-        all_graphs.append(load_graph_set("_graphs/validation/{}_{}spin_p15_100graphs.pkl".format(graph_type, i)))
+        all_graphs.append(load_graph_set("_graphs/validation/{}_{}spin_{}_100graphs.pkl".format(graph_test_type, i, graph_connection_parameter)))
 
     ### CONVERT GRAPHS TO UNIFORM
     if problem_params['edge_type'] == EdgeType.UNIFORM:
@@ -113,9 +114,6 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             for i in range(len(diff_vert_count)):
                 diff_vert_count[i] = np.array(diff_vert_count[i] != 0, dtype=np.float64)
 
-# MAX DOM SET
-# CLIQUE
-    
     ####################################################
     # SETUP NETWORK TO TEST
     ####################################################
@@ -176,7 +174,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
 
     test_envs : list[SpinSystemBase] = [None] * batch_size
 
-    for i, graphs in enumerate(all_graphs):
+    for _, graphs in enumerate(all_graphs):
         # append batches
         for algorithm in solutions:
             solutions[algorithm][str(graphs[0].shape[0])] = []
@@ -192,6 +190,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
         # histories['neural network full {}'.format(num_vertices)][str(graphs[0].shape[0])] = []
 
         for j, test_graph in enumerate(graphs):
+
             env_args = {
                 'observables': problem_params['observables'],
                 'reward_signal': problem_params['reward_signal'],
@@ -340,32 +339,6 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
             times['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
             # if len(histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])]) < 10:
             #     histories['neural network full {}'.format(num_vertices)][str(test_graph.shape[0])].append(network_solver.history)
-
-            # # Next test network from random state (run 50 tests on each graph)
-            # print("Running GECO on random inital state.")
-            # obs_batch = []
-            # done = False
-            # # Reset all the environments
-            # for env in test_envs:
-            #     obs_batch.append(env.reset())
-
-            # start = time.time()
-
-            # while not done:
-            #     obs_batch = torch.FloatTensor(np.array(obs_batch)).to(device)
-            #     # All envs in the batch have the same parameters, so pass them all to the predict
-            #     actions = predict(network, obs_batch, test_envs[0].reversible_spins, test_envs[0].get_allowed_action_states())
-
-            #     obs_batch = []
-            #     for env, action in zip(test_envs, actions):
-            #         obs, rew, done, info = env.step(action)
-            #         obs_batch.append(obs)
-
-            # end = time.time()
-
-            # # Once done, add a list of every best solution to the solutions array
-            # solutions['neural network random {}'.format(num_vertices)][str(test_graph.shape[0])].append([env.best_solution for env in test_envs])
-            # times['neural network random {}'.format(num_vertices)][str(test_graph.shape[0])].append(end - start)
     
         # Print this data to file for every new batch to save partway through
         with open("data/{}_test_data{}.txt".format(problem_type, num_vertices), 'w') as f:
@@ -379,7 +352,7 @@ def run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms
         #         json.dump(histories[hist], f, indent=4, cls=NpEncoder)
 
 
-def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_type : str = 'ER', network_type='eco', stopping_type='normal'):
+def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', graph_train_type : str = 'ER', graph_test_type : str = 'ER',  network_type='eco', stopping_type='normal'):
     if problem_type == 'min_cover':
         problem_params = {
             'optimisation': OptimisationTarget.MIN_COVER,
@@ -477,7 +450,7 @@ def run_with_params(num_vertices : int = 20, problem_type : str = 'min_cover', g
         print('Invalid stopping type.')
         exit(1)
 
-    run(num_vertices, problem_type, graph_type, problem_params, fixed_algorithms, random_algorithms, stepped_algorithms)
+    run(num_vertices, problem_type, graph_train_type, graph_test_type, problem_params, fixed_algorithms, random_algorithms, stepped_algorithms)
 
 
 def predict(network, states, acting_in_reversible_spin_env, allowed_action_state):
@@ -509,8 +482,9 @@ def predict(network, states, acting_in_reversible_spin_env, allowed_action_state
 
 if __name__ == "__main__":
     num_vertices = 20
-    graph_type = 'ER'
+    graph_train_type = 'ER'
+    graph_test_type = 'ER'
     problem_type = 'min_cover'
     network_type = 'eco'
     stopping_type = 'normal'
-    run_with_params(num_vertices, problem_type, graph_type, network_type, stopping_type)
+    run_with_params(num_vertices, problem_type, graph_train_type, graph_test_type, network_type, stopping_type)

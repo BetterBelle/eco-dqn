@@ -56,7 +56,8 @@ def run(num_vertices, problem_type, dqn_params, problem_params, graph_type, trai
     ####
     # Pre-generated test graphs
     ####
-    graph_save_loc = "_graphs/testing/{}_{}spin_p15_50graphs.pkl".format(graph_type, num_vertices)
+    graph_edge_parameter = 'p15' if graph_type == 'ER' else 'm4'
+    graph_save_loc = "_graphs/testing/{}_{}spin_{}_50graphs.pkl".format(graph_type, num_vertices, graph_edge_parameter)
     graphs_test = load_graph_set(graph_save_loc)
     n_tests = len(graphs_test)
 

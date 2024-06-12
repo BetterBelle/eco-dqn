@@ -38,13 +38,15 @@ width = 0.12
 # Want to get mean from every non-single graph test
 for alg in solution_data:
     # If the solution_data's first graph size's first item is a list, then we want to change it to the mean solution
-    if type(solution_data[alg]['20'][0]) == list:
+    first_key = list(solution_data[alg].keys())[0]
+    if type(solution_data[alg][first_key][0]) == list:
         for vert in solution_data[alg]:
             for j in range(len(solution_data[alg][vert])):
                 solution_data[alg][vert][j] = np.mean(solution_data[alg][vert][j])
 
 for alg in solution_times:
-    if type(solution_times[alg]['20'][0]) == list:
+    first_key = list(solution_data[alg].keys())[0]
+    if type(solution_times[alg][first_key][0]) == list:
         for vert in solution_times[alg]:
             for j in range(len(solution_times[alg][vert])):
                 solution_times[alg][vert][j] = np.mean(solution_times[alg][vert][j])
