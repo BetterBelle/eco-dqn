@@ -696,7 +696,7 @@ class MinimumDominatingSetSolver(MinimizationProblem):
             new_invalidities.append(self.get_invalidity_degree(new_spins, matrix))
 
         current_invalidity = self.get_invalidity_degree(spins, matrix)
-        change_in_validity = new_invalidities - current_invalidity  
+        change_in_validity = new_invalidities - np.array(current_invalidity, dtype=np.float64)
         return change_in_validity
     
     def get_invalidity_degree(self, spins : npt.ArrayLike, matrix : npt.ArrayLike) -> float:
